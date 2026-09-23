@@ -1,0 +1,9 @@
+random baseline -279.7 params 11908
+noreplay step 5000 eval -297.2 win 0% len 7 eps 0.68 loss 0.0808 2056 sps
+noreplay step 10000 eval -232.7 win 0% len 15 eps 0.37 loss 0.0000 1928 sps
+noreplay step 15000 eval -248.6 win 0% len 7 eps 0.05 loss 0.0006 1899 sps
+noreplay step 20000 eval -214.8 win 0% len 20 eps 0.05 loss 0.0085 1896 sps
+noreplay step 25000 eval -196.0 win 0% len 21 eps 0.05 loss 0.0013 1898 sps
+noreplay step 30000 eval -226.4 win 0% len 21 eps 0.05 loss 0.0066 1897 sps
+noreplay step 35000 eval -179.7 win 0% len 25 eps 0.05 loss 0.0026 1886 sps
+noreplay step 40000 eval -187.2 win 0% len 21 eps 0.05 loss 0.0385 1878 sps

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>The DQN Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Recursive:slnt,wght,CASL,CRSV,MONO@-15..0,300..1000,0..1,0..1,0..1&display=swap" rel="stylesheet">
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<header class="hero">
+  <h1 class="title">The DQN Workshop</h1>
+  <p class="lede">A Deep Q-Network learns by grading its own guesses. After every move it asks one question: how far off was my guess, compared with what actually happened plus my guess about what happens next? Then it nudges its weights to shrink that gap. The three stations below let you poke at that loop until it clicks.</p>
+
+  <figure class="equation" aria-label="The update rule: the guess q is nudged toward r plus gamma times v">
+    <div class="eq-row">
+      <span class="tok t-guess"><span class="sym">q</span><span class="cap">the guess</span></span>
+      <span class="tok t-arrow" aria-hidden="true"><span class="sym"><svg viewBox="0 0 60 24" width="1.6em" height="0.64em"><path d="M58 12H6M16 3 5 12l11 9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cap">nudged toward</span></span>
+      <span class="tok t-reward"><span class="sym">r</span><span class="cap">reward you got</span></span>
+      <span class="op">+</span>
+      <span class="tok t-gamma"><span class="sym">γ</span><span class="cap">future discount</span></span>
+      <span class="op">·</span>
+      <span class="tok t-frozen"><span class="sym">v</span><span class="cap">value of where you land</span></span>
+    </div>
+    <figcaption>Everything right of the arrow is the <span class="hl hl-target">target</span>. The distance between the guess and the target is the <span class="hl hl-gap">gap</span>. Learning is nothing more than shrinking that gap, millions of times. Colors stay the same on every station: <span class="hl hl-live">live network</span>, <span class="hl hl-frozen">frozen copy</span>.</figcaption>
+  </figure>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Stations">
+  <button class="tab" role="tab" id="tab-bench" aria-controls="panel-bench" aria-selected="true">The Bench<span>one update, up close</span></button>
+  <button class="tab" role="tab" id="tab-tank" aria-controls="panel-tank" aria-selected="false" tabindex="-1">Ripple Tank<span>truth flows backward</span></button>
+  <button class="tab" role="tab" id="tab-arcade" aria-controls="panel-arcade" aria-selected="false" tabindex="-1">Arcade<span>train a whole agent</span></button>
+</nav>
+
+<main>
+<!-- ============================================================ BENCH -->
+<section class="panel" id="panel-bench" role="tabpanel" aria-labelledby="tab-bench">
+  <div class="intro">
+    <h2>The Bench</h2>
+    <p>Set up one moment of the game, pick a move, and watch a single update happen with real numbers from a real network. Change anything (the board, the move, a knob) and the whole worked solution recomputes.</p>
+  </div>
+
+  <div class="bench-grid">
+    <div class="bench-left">
+      <div class="field">
+        <span class="field-name" id="lbl-brain">Brain</span>
+        <div class="seg" id="bench-brain" role="group" aria-labelledby="lbl-brain">
+          <button data-v="trained" aria-pressed="true">Trained</button>
+          <button data-v="fresh" aria-pressed="false">Fresh</button>
+          <button data-v="arcade" aria-pressed="false">From Arcade</button>
+        </div>
+        <p class="note" id="bench-brain-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-name">Try a situation</span>
+        <div class="chips" id="bench-scenarios"></div>
+      </div>
+
+      <div class="screen">
+        <div class="maze" id="bench-board" aria-label="Game board. Tap a square to edit it."></div>
+        <div class="seg seg-screen" id="bench-overlay" role="group" aria-label="What to show on the board">
+          <button data-v="game" aria-pressed="true">Game</button>
+          <button data-v="value" aria-pressed="false">Value map</button>
+          <button data-v="ripple" aria-pressed="false">Ripple</button>
+        </div>
+        <p class="screen-note" id="bench-overlay-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-name" id="lbl-tool">Tapping a square will</span>
+        <div class="seg" id="bench-tool" role="group" aria-labelledby="lbl-tool">
+          <button data-v="pac" aria-pressed="true">Move Pac-Man</button>
+          <button data-v="ghost" aria-pressed="false">Move ghost</button>
+          <button data-v="pellet" aria-pressed="false">Add or remove a pellet</button>
+        </div>
+      </div>
+
+      <div class="move-row">
+        <div class="field">
+          <span class="field-name" id="lbl-move">Pick a move</span>
+          <div class="pad" id="bench-pad" role="group" aria-labelledby="lbl-move">
+            <button data-a="0" aria-label="Up" class="p-up"><svg viewBox="0 0 24 24"><path d="M12 5 4 16h16z"/></svg></button>
+            <button data-a="2" aria-label="Left" class="p-left"><svg viewBox="0 0 24 24"><path d="M5 12 16 4v16z"/></svg></button>
+            <button data-a="3" aria-label="Right" class="p-right"><svg viewBox="0 0 24 24"><path d="M19 12 8 4v16z"/></svg></button>
+            <button data-a="1" aria-label="Down" class="p-down"><svg viewBox="0 0 24 24"><path d="M12 19 4 8h16z"/></svg></button>
+          </div>
+        </div>
+        <div class="outcome">
+          <span class="field-name">What happened (S′)</span>
+          <div class="maze mini" id="bench-next" aria-hidden="true"></div>
+          <div class="reward-parts" id="bench-parts"></div>
+        </div>
+      </div>
+      <p class="reward-line" id="bench-rline"></p>
+
+      <details class="drawer">
+        <summary>Change the rewards</summary>
+        <p class="note">Game points. They are multiplied by 0.01 before training, so a pellet (+10) becomes +0.10. These only affect the Bench.</p>
+        <div class="knobs" id="bench-reward-knobs"></div>
+        <button class="btn quiet" id="bench-reward-reset">Reset rewards</button>
+      </details>
+    </div>
+
+    <ol class="worked" id="bench-worked">
+      <li class="step">
+        <h3>The guess</h3>
+        <p>The <span class="hl hl-live">live network</span> looks at board S and scores all four moves. Only the move you picked gets graded.</p>
+        <div class="qbars" id="bars-guess"></div>
+        <p class="readout">q(S, <span id="ro-move"></span>) = <b class="num c-guess" id="ro-q"></b></p>
+      </li>
+      <li class="step">
+        <h3>Peek at the future</h3>
+        <p id="future-text"></p>
+        <div class="future-pair" id="future-pair">
+          <div><span class="mini-cap" id="cap-picker">Live network picks the best next move</span><div class="qbars small" id="bars-pick"></div></div>
+          <div><span class="mini-cap" id="cap-valuer">Frozen copy says what it is worth</span><div class="qbars small" id="bars-value"></div></div>
+        </div>
+        <div class="game-over" id="future-over" hidden>The game ended on this move, so there is no future to add. v = 0.</div>
+        <p class="readout">v = <b class="num c-frozen" id="ro-v"></b></p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="bench-frozen" checked><span>Use a frozen copy for v</span></label>
+          <label class="toggle"><input type="checkbox" id="bench-double" checked><span>Double DQN (live picks, frozen scores)</span></label>
+        </div>
+      </li>
+      <li class="step">
+        <h3>The target</h3>
+        <p>What q should have been, in hindsight: the reward you actually got, plus the discounted value of where you ended up.</p>
+        <div class="formula" id="bench-formula"></div>
+        <div class="knobs" id="bench-gamma-knob"></div>
+      </li>
+      <li class="step">
+        <h3>The gap</h3>
+        <p>Guess against target. This single number is what the whole network gets adjusted to shrink.</p>
+        <div class="gapviz" id="bench-gapviz"></div>
+        <p class="readout">gap = <b class="num c-gap" id="ro-gap"></b> &nbsp; loss = <b class="num" id="ro-loss"></b></p>
+        <p class="note" id="gap-words"></p>
+      </li>
+      <li class="step">
+        <h3>Nudge the weights</h3>
+        <p>Backpropagation works out, for every one of the network’s <span id="param-count"></span> weights, which direction would move q toward the target. Each nudge moves every weight a tiny step that way.</p>
+        <div class="knobs" id="bench-lr-knob"></div>
+        <div class="btn-row">
+          <button class="btn primary" data-nudge="1">Nudge once</button>
+          <button class="btn" data-nudge="10">Nudge ×10</button>
+          <button class="btn" data-nudge="100">Nudge ×100</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn quiet" id="bench-sync">Sync frozen copy</button>
+          <button class="btn quiet" id="bench-undo">Undo all nudges</button>
+        </div>
+        <div class="chart-wrap"><canvas id="bench-chart" aria-label="Chart of the guess and target over nudges"></canvas></div>
+        <p class="note" id="nudge-words">Press a nudge button to watch the guess move toward the target.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================ TANK -->
+<section class="panel" id="panel-tank" role="tabpanel" aria-labelledby="tab-tank" hidden>
+  <div class="intro">
+    <h2>Ripple Tank</h2>
+    <p>A simpler world: one cherry worth +10, one ghost worth −10. At the start no square knows anything, so the map is blank. The only true information enters where rewards happen, then leaks backward into the guesses, one step at a time.</p>
+  </div>
+  <div class="tank-grid">
+    <div class="tank-left">
+      <div class="screen">
+        <div class="tank" id="tank-board" aria-label="Grid world. Tap a square to edit it."></div>
+        <div class="legend-bar"><span>−10</span><i></i><span>0</span><i class="pos"></i><span>+10</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="tank-run">Explore</button>
+        <button class="btn" id="tank-step">One step</button>
+        <button class="btn" id="tank-sweep">Sweep</button>
+        <button class="btn quiet" id="tank-reset">Forget everything</button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-ttool">Tapping a square will place</span>
+        <div class="seg" id="tank-tool" role="group" aria-labelledby="lbl-ttool">
+          <button data-v="2" aria-pressed="false">Cherry</button>
+          <button data-v="3" aria-pressed="false">Ghost</button>
+          <button data-v="1" aria-pressed="true">Wall</button>
+          <button data-v="0" aria-pressed="false">Empty</button>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="tank-nums"><span>Show the numbers</span></label>
+    </div>
+    <div class="tank-right">
+      <div class="field">
+        <span class="field-name" id="lbl-tbrain">Brain</span>
+        <div class="seg" id="tank-brain" role="group" aria-labelledby="lbl-tbrain">
+          <button data-v="table" aria-pressed="true">Table</button>
+          <button data-v="net" aria-pressed="false">Network</button>
+        </div>
+        <p class="note" id="tank-brain-note"></p>
+      </div>
+      <div class="last-update" id="tank-last" aria-live="polite"></div>
+      <dl class="stats" id="tank-stats"></dl>
+      <div class="knobs" id="tank-knobs"></div>
+      <div class="tries">
+        <h3>Things to try</h3>
+        <ul>
+          <li>Press <b>Sweep</b> a few times. Each sweep grades every square once, against a frozen snapshot of the previous sweep, and the color spreads exactly one square further from the cherry. That is the reward leaking backward.</li>
+          <li>Slide <b>future discount</b> down to 0.5. Far squares barely care about the cherry anymore: the glow fades fast with distance.</li>
+          <li>Switch to <b>Network</b> and press One step. A single update tints many squares at once, because they share weights. That sharing is why DQN uses a network: it can guess about squares it has never visited.</li>
+          <li>After it has learned, move the cherry. Watch the old knowledge get overwritten.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ARCADE -->
+<section class="panel" id="panel-arcade" role="tabpanel" aria-labelledby="tab-arcade" hidden>
+  <div class="intro">
+    <h2>Arcade</h2>
+    <p>Now the whole machine: a brand-new network plays this maze, stores every moment in a replay memory, and learns from random handfuls of it using exactly the update from the Bench. It starts out walking into walls and ghosts. Keep an eye on the exam line under the stats: expect it to start climbing after roughly 20,000 steps, a few minutes on Turbo. Or load the trained brain to skip ahead.</p>
+  </div>
+  <div class="arcade-grid">
+    <div class="arcade-left">
+      <div class="screen">
+        <div class="maze" id="arcade-board" aria-label="The agent playing"></div>
+        <div class="screen-status" id="arcade-status"></div>
+      </div>
+      <div class="field">
+        <span class="mini-cap">What the <span class="hl hl-live">live network</span> thinks of each move right now</span>
+        <div class="qbars small" id="arcade-q"></div>
+      </div>
+    </div>
+    <div class="arcade-right">
+      <div class="btn-row">
+        <button class="btn primary" id="arc-train">Start training</button>
+        <button class="btn" id="arc-test">Test drive</button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-speed">Speed</span>
+        <div class="seg" id="arc-speed" role="group" aria-labelledby="lbl-speed">
+          <button data-v="watch" aria-pressed="true">Watch</button>
+          <button data-v="fast" aria-pressed="false">Fast</button>
+          <button data-v="turbo" aria-pressed="false">Turbo</button>
+        </div>
+      </div>
+      <dl class="stats" id="arc-stats"></dl>
+      <div class="chart-wrap tall"><canvas id="arc-chart" aria-label="Score per game while training"></canvas></div>
+      <p class="note">The line is the <span class="hl hl-live">exam</span>: every 2,500 steps the agent plays the same 10 games with no random moves and no learning, which shows what it has really learned. Dots are practice games, which include random moves. Dashed line: random play.</p>
+      <div class="btn-row">
+        <button class="btn quiet" id="arc-load">Load the trained brain</button>
+        <button class="btn quiet" id="arc-send">Send this brain to the Bench</button>
+        <button class="btn quiet" id="arc-reset">Start over</button>
+      </div>
+    </div>
+  </div>
+
+  <details class="drawer" id="arc-knob-drawer">
+    <summary>Knobs</summary>
+    <div class="knobs two" id="arc-knobs"></div>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="arc-replay" checked><span>Replay memory</span></label>
+      <label class="toggle"><input type="checkbox" id="arc-frozen" checked><span>Frozen copy</span></label>
+      <label class="toggle"><input type="checkbox" id="arc-double" checked><span>Double DQN</span></label>
+    </div>
+    <button class="btn quiet" id="arc-defaults">Restore default knobs</button>
+  </details>
+
+  <div class="experiments">
+    <h3>Experiments</h3>
+    <p class="note">Each one changes a knob and marks the moment on the chart so you can see the effect. Run them on a brain that is already learning (or load the trained one) and give each a minute on Turbo.</p>
+    <div class="exp-list" id="arc-experiments"></div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <p>Built from scratch for this page: an 11,908-weight network with hand-written backpropagation, Adam, replay memory, a frozen target copy and Double DQN, all running in your browser. Same algorithm as the pacdqn project, smaller maze.</p>
+</footer>
+
+<script>/*__ENGINE__*/</script>
+<script>/*__UI__*/</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "dqn-workshop",
+  "private": true,
+  "description": "The DQN Workshop: an interactive, from-scratch Deep Q-Network teaching page",
+  "scripts": {
+    "test": "node test_engine.js",
+    "build": "node build.js",
+    "qa": "node qa.js",
+    "qa:extra": "node qa_extra.js",
+    "train": "node train_brain.js"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^131.0.1",
+    "puppeteer-core": "^23.11.1"
+  }
+}

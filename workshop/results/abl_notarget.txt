@@ -1,0 +1,11 @@
+random baseline -279.7 params 11908
+notarget step 5000 eval -253.2 win 0% len 15 eps 0.68 loss 0.1553 580 sps
+notarget step 10000 eval -233.5 win 0% len 21 eps 0.37 loss 0.0937 541 sps
+notarget step 15000 eval -15.0 win 0% len 134 eps 0.05 loss 0.1003 534 sps
+notarget step 20000 eval -144.3 win 0% len 97 eps 0.05 loss 0.0312 536 sps
+notarget step 25000 eval -18.3 win 0% len 144 eps 0.05 loss 0.0101 537 sps
+notarget step 30000 eval -15.2 win 0% len 129 eps 0.05 loss 0.0100 541 sps
+notarget step 35000 eval -79.8 win 0% len 114 eps 0.05 loss 0.0036 543 sps
+notarget step 40000 eval 37.9 win 0% len 135 eps 0.05 loss 0.0028 546 sps
+notarget step 45000 eval -19.0 win 14% len 87 eps 0.05 loss 0.0171 553 sps
+notarget step 50000 eval -15.6 win 8% len 111 eps 0.05 loss 0.0009 559 sps
