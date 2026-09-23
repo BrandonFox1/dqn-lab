@@ -15,6 +15,10 @@ npm run build     # -> dist/dqn-workshop.html
 npm run qa        # 23 headless Chrome checks (Linux), screenshots in shots/
 node qa_extra.js  # exam schedule check + extra screenshots
 ```
+Commit `dist/` after building: CI rebuilds it and fails if the committed copy differs.
+
+## Publishing
+`.github/workflows/workshop.yml` runs all of the above on every pull request that touches `workshop/`, and on every push to `main` publishes `dist/dqn-workshop.html` to GitHub Pages at https://brandonfox1.github.io/dqn-lab/. One-time setup: Settings → Pages → Source: GitHub Actions (a private repo needs a paid GitHub plan for Pages; the site itself is public). The claude.ai copy is republished by attaching the same file in a claude.ai chat.
 
 ## Training the brains
 ```bash

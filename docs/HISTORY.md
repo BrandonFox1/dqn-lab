@@ -10,7 +10,8 @@ Everything below happened in one claude.ai conversation on 2026-09-23. The verba
 5. **Explainer GIF** (`explainers/`) built from one real transition of pacdqn's `best.pt` (numbers below).
 6. **The DQN Workshop**: an interactive page, built, tested and published at https://claude.ai/artifact/83NAYFuuY2pjCfeYbm4UG4
 7. **"What if it were the original arcade game, 4 ghosts and all?"** Answered in detail (summary below; plan in `ROADMAP.md`).
-8. **Move to Claude Code**: this repo.
+8. **Move to Claude Code**: this repo. First session: all checks green (pytest 33 pass + 1 gymnasium skip, 19 engine tests, build byte-identical to the shipped page, 23/23 QA).
+9. **GitHub Pages**: `.github/workflows/workshop.yml` checks every workshop PR (tests, build, dist freshness, browser QA) and publishes the page to https://brandonfox1.github.io/dqn-lab/ on every merge to `main`, so updates no longer need a claude.ai chat.
 
 ## pacdqn (Python)
 - **Environment**: original Pac-Man-style maze (no Namco assets). Mazes `small` 11×13 and `medium` 18×19. 8-channel grid observation: walls, pellets, power pellets, player, dangerous ghosts, frightened ghosts, ghosts' previous cells, power-timer plane. Ghosts take the BFS-shortest step with probability "aggression" (0.9, 0.7, 0.5, 0.3), can't reverse mid-corridor, flee at half speed after a power pellet. Rewards in points: pellet +10, power +50, ghost +200, clear +500, death −500, step −1; trained on points × 0.01. Death stops bootstrapping, the step limit does not.
@@ -85,4 +86,4 @@ Continuing training at default settings, greedy exams every 4k steps stayed at 9
 - The Bench uses plain SGD for nudges (step size proportional to the gradient, easy to explain), a deterministic chase ghost (predictable S′), and a live Double DQN / frozen copy toggle.
 - The Arcade headline metric is an exam, not practice scores.
 - Experiment notes come from measured runs and say "in our test run".
-- The page is one self-contained HTML file, published from claude.ai.
+- The page is one self-contained HTML file, published from claude.ai and (from the Claude Code move on) GitHub Pages via Actions. The Pages site is built from the committed `dist/`, and CI fails if that file is stale, so the file attached to claude.ai and the Pages site can't drift apart.

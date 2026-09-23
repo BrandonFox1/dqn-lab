@@ -45,6 +45,7 @@ workshop/
   train_brain.js, finetune.js, check_continue.js, run_ablations.sh
   results/                training/fine-tune/ablation logs
   dist/dqn-workshop.html  the built page (what's published)
+.github/workflows/workshop.yml   PR checks for workshop/ + GitHub Pages deploy on main
 ```
 
 ## Commands
@@ -73,7 +74,12 @@ workshop/
 - Buttons inside closed `<details>` (the Arcade knobs drawer) must be opened before clicking.
 
 ## Publishing
-The live page is https://claude.ai/artifact/83NAYFuuY2pjCfeYbm4UG4, published from claude.ai. Claude Code can't update claude.ai artifacts. To ship an update: attach `workshop/dist/dqn-workshop.html` in a claude.ai chat and ask to republish it to that link, or host `workshop/dist/` on GitHub Pages.
+Two homes for the page, both serving the same `workshop/dist/dqn-workshop.html`:
+- **GitHub Pages** (https://brandonfox1.github.io/dqn-lab/): `.github/workflows/workshop.yml` publishes it on every push to `main` that touches `workshop/`. Nothing to do by hand: merge the PR.
+- **claude.ai** (https://claude.ai/artifact/83NAYFuuY2pjCfeYbm4UG4): Claude Code can't update claude.ai artifacts. Attach `workshop/dist/dqn-workshop.html` in a claude.ai chat and ask to republish it to that link.
+
+The workflow also gates every PR that touches `workshop/`: engine tests, build, **committed `dist/` must equal a fresh build** (so always run `npm run build` and commit `dist/`), `qa.js`, and `qa_extra.js`. QA screenshots are uploaded as the `qa-screenshots` artifact on each run.
+- Pages needs a one-time switch: Settings → Pages → Source: GitHub Actions. The repo is private, which needs a paid GitHub plan for Pages (or make the repo public). A Pages site is public either way. Until it's on, the deploy job skips with a warning rather than failing; after switching it on, run Actions → Workshop → Run workflow.
 
 ## pacdqn notes
 - `runs/small/best.pt` is weights-only (optimizer state stripped, 14.8 MB → 4.9 MB); `DQNAgent.load` skips the optimizer when absent. `latest.pt` isn't included, so `--resume` on runs/small isn't available: start a new run.
