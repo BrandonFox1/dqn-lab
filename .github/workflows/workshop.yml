@@ -1,0 +1,114 @@
+# The DQN Workshop: test, build and QA on every pull request that touches it,
+# and publish the built page to GitHub Pages on every push to main.
+#
+# One-time setup: repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# Until that's done the deploy job skips itself with a warning instead of failing.
+name: Workshop
+
+on:
+  push:
+    branches: [main]
+    paths: ['workshop/**', '.github/workflows/workshop.yml']
+  pull_request:
+    paths: ['workshop/**', '.github/workflows/workshop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workshop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Test, build and QA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workshop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Engine tests (19)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # dist/ is committed (it's what gets attached in claude.ai), so it must match the sources.
+      - name: Committed dist/ matches the sources
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "::error file=workshop/dist/dqn-workshop.html::dist/ is out of date. Run 'npm run build' in workshop/ and commit the result."
+            git diff --stat -- dist
+            exit 1
+          fi
+
+      - name: Install QA browser
+        run: npm install --no-audit --no-fund
+
+      - name: Browser QA (23 checks)
+        run: npm run qa
+
+      - name: Exam schedule check
+        run: |
+          node qa_extra.js | tee qa_extra.out
+          grep -q 'ok: true' qa_extra.out
+          grep -q 'errors: none' qa_extra.out
+
+      - name: Upload QA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-screenshots
+          path: workshop/shots/
+          if-no-files-found: ignore
+
+      - name: Stage site
+        run: |
+          mkdir -p ../_site
+          cp dist/dqn-workshop.html ../_site/index.html
+          cp dist/dqn-workshop.html ../_site/dqn-workshop.html
+
+      - name: Upload site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Is Pages switched on?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" --jq .build_type > build_type.txt 2>/dev/null \
+             && [ "$(cat build_type.txt)" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Pages isn't set to deploy from Actions yet, so nothing was published. Turn it on in Settings -> Pages -> Source: GitHub Actions, then re-run this workflow (Actions -> Workshop -> Run workflow)."
+          fi
+
+      - name: Deploy
+        if: steps.pages.outputs.enabled == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4

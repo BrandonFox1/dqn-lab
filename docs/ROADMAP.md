@@ -4,7 +4,6 @@
 - **Real-phone performance check.** Target Turbo ≥ 150 steps/s with rendering. If it's slow, move training into a Web Worker (verify the page's content-security policy allows blob workers) or render less often.
 - **Multi-seed experiments.** Re-run `run_ablations.sh` with 3–5 seeds each and show the spread; update `src/experiment-notes.json`.
 - **Brain scan on the Bench.** Show hidden-layer activations for the current board and which weights moved most on a nudge.
-- **Hosting.** Publish `workshop/dist/` on GitHub Pages so updates don't need a claude.ai chat (the claude.ai link can still be republished from a chat).
 - **Accessibility.** Screen-reader descriptions for boards and charts, plus an explicit theme toggle.
 - **Teaching extras.** An n-step target toggle on the Bench; show the actual gradient for a few weights.
 
