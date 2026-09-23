@@ -1,0 +1,8 @@
+random baseline -279.7 params 11908
+gamma05 step 5000 eval -223.3 win 0% len 14 eps 0.68 loss 0.1097 487 sps
+gamma05 step 10000 eval -203.5 win 0% len 20 eps 0.37 loss 0.0225 461 sps
+gamma05 step 15000 eval -207.3 win 0% len 21 eps 0.05 loss 0.0155 461 sps
+gamma05 step 20000 eval 8.1 win 26% len 79 eps 0.05 loss 0.0191 464 sps
+gamma05 step 25000 eval 191.4 win 60% len 88 eps 0.05 loss 0.0624 469 sps
+gamma05 step 30000 eval 346.1 win 90% len 78 eps 0.05 loss 0.0037 474 sps
+gamma05 step 35000 eval 314.0 win 76% len 82 eps 0.05 loss 0.0014 479 sps

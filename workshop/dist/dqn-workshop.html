@@ -1,0 +1,2127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>The DQN Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Recursive:slnt,wght,CASL,CRSV,MONO@-15..0,300..1000,0..1,0..1,0..1&display=swap" rel="stylesheet">
+<style>/* ---------- tokens: light = engineering notebook, dark = blueprint ---------- */
+:root {
+  --paper: #eef3f1;
+  --grid-line: #d6e1dc;
+  --grid-major: #c6d4ce;
+  --ink: #16263a;
+  --ink-2: #4c5e6e;
+  --ink-3: #7b8b98;
+  --rule: #c5d2cc;
+  --sheet: #fbfcfb;
+  --sheet-2: #f3f7f5;
+  --margin-line: #e3a3a3;
+  --btn: #16263a;
+  --btn-ink: #fbfcfb;
+  --focus: #2a62d9;
+
+  --guess: #d99a00;
+  --guess-soft: #ffd54a;
+  --target: #13875c;
+  --gap: #cf3434;
+  --live: #2a62d9;
+  --frozen: #7446d1;
+  --reward: #cf6a12;
+
+  --screen: #0c1530;
+  --screen-edge: #1d2b57;
+  --wall: #2745a8;
+  --wall-hi: #4a6fe0;
+  --pellet: #ffd9a0;
+  --pac: #ffd23f;
+  --ghost: #ff5a5f;
+  --heat-pos: #37d890;
+  --heat-neg: #ff4d5a;
+  --screen-ink: #e8ecf6;
+
+  --bar-idle: #b5c3cc;
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --shadow: 0 1px 0 rgba(22, 38, 58, .06), 0 6px 18px -10px rgba(22, 38, 58, .35);
+  --font: "Recursive", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d2340; --grid-line: #15345a; --grid-major: #1b4170;
+    --ink: #e6eef7; --ink-2: #a3b7cb; --ink-3: #7690aa; --rule: #23486f;
+    --sheet: #102b4d; --sheet-2: #133259; --margin-line: #8a4b62;
+    --btn: #e6eef7; --btn-ink: #0d2340; --focus: #8fb4ff;
+    --guess: #ffd23f; --guess-soft: #ffd23f; --target: #4fd18b; --gap: #ff6b6b;
+    --live: #7aa7ff; --frozen: #b89dff; --reward: #ffa552;
+    --screen: #06101f; --screen-edge: #1a3358; --bar-idle: #3d5d82;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 22px -12px rgba(0,0,0,.7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d2340; --grid-line: #15345a; --grid-major: #1b4170;
+  --ink: #e6eef7; --ink-2: #a3b7cb; --ink-3: #7690aa; --rule: #23486f;
+  --sheet: #102b4d; --sheet-2: #133259; --margin-line: #8a4b62;
+  --btn: #e6eef7; --btn-ink: #0d2340; --focus: #8fb4ff;
+  --guess: #ffd23f; --guess-soft: #ffd23f; --target: #4fd18b; --gap: #ff6b6b;
+  --live: #7aa7ff; --frozen: #b89dff; --reward: #ffa552;
+  --screen: #06101f; --screen-edge: #1a3358; --bar-idle: #3d5d82;
+  --shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 22px -12px rgba(0,0,0,.7);
+  color-scheme: dark;
+}
+
+/* ---------- base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-variation-settings: "CASL" 0, "MONO" 0;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  background-position: -1px -1px;
+}
+h1, h2, h3 { line-height: 1.15; margin: 0; }
+p { margin: 0 0 .75em; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.num { font-variation-settings: "MONO" 1, "CASL" 0; font-feature-settings: "tnum" 1; letter-spacing: -.01em; }
+.c-guess { color: var(--guess); } .c-target { color: var(--target); } .c-gap { color: var(--gap); }
+.c-live { color: var(--live); } .c-frozen { color: var(--frozen); } .c-reward { color: var(--reward); }
+:root:not([data-theme="dark"]) .c-guess { color: #9a6c00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .c-guess { color: var(--guess); } }
+
+/* highlighter strokes */
+.hl { padding: 0 .12em; border-radius: .2em; background-repeat: no-repeat; background-size: 100% 62%; background-position: 0 80%; }
+.hl-guess { background-image: linear-gradient(color-mix(in srgb, var(--guess-soft) 55%, transparent), color-mix(in srgb, var(--guess-soft) 55%, transparent)); }
+.hl-target { background-image: linear-gradient(color-mix(in srgb, var(--target) 30%, transparent), color-mix(in srgb, var(--target) 30%, transparent)); }
+.hl-gap { background-image: linear-gradient(color-mix(in srgb, var(--gap) 28%, transparent), color-mix(in srgb, var(--gap) 28%, transparent)); }
+.hl-live { background-image: linear-gradient(color-mix(in srgb, var(--live) 28%, transparent), color-mix(in srgb, var(--live) 28%, transparent)); }
+.hl-frozen { background-image: linear-gradient(color-mix(in srgb, var(--frozen) 28%, transparent), color-mix(in srgb, var(--frozen) 28%, transparent)); }
+
+/* ---------- hero ---------- */
+.hero { max-width: 1120px; margin: 0 auto; padding: 28px 18px 8px; }
+.title {
+  font-size: clamp(2.5rem, 11vw, 5.4rem);
+  font-weight: 900;
+  font-variation-settings: "CASL" 1, "slnt" -6, "CRSV" 1;
+  letter-spacing: -.035em;
+  line-height: .95;
+  max-width: 11ch;
+}
+.lede { max-width: 62ch; margin-top: 16px; font-size: 1.04rem; color: var(--ink-2); }
+
+.equation { margin: 22px 0 6px; padding: 18px 16px 14px; background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-m); box-shadow: var(--shadow); max-width: 760px; position: relative; }
+.eq-row { display: flex; align-items: flex-start; justify-content: flex-start; gap: .1em .35em; flex-wrap: nowrap; font-size: clamp(2rem, 10.5vw, 3.6rem); }
+.tok { display: inline-flex; flex-direction: column; align-items: center; min-width: 0; }
+.tok .sym {
+  font-weight: 800; font-variation-settings: "CASL" 1, "slnt" -8, "CRSV" 1; line-height: 1.1;
+  padding: 0 .16em; border-radius: .18em;
+  background-repeat: no-repeat; background-position: 0 85%; background-size: 0% 55%;
+  transition: background-size .5s cubic-bezier(.2,.7,.2,1);
+}
+.eq-drawn .tok .sym { background-size: 100% 55%; }
+.t-guess .sym { background-image: linear-gradient(color-mix(in srgb, var(--guess-soft) 70%, transparent), color-mix(in srgb, var(--guess-soft) 70%, transparent)); }
+.t-reward .sym { background-image: linear-gradient(color-mix(in srgb, var(--reward) 40%, transparent), color-mix(in srgb, var(--reward) 40%, transparent)); transition-delay: .25s; }
+.t-gamma .sym { background-image: linear-gradient(color-mix(in srgb, var(--ink-3) 30%, transparent), color-mix(in srgb, var(--ink-3) 30%, transparent)); transition-delay: .4s; }
+.t-frozen .sym { background-image: linear-gradient(color-mix(in srgb, var(--frozen) 40%, transparent), color-mix(in srgb, var(--frozen) 40%, transparent)); transition-delay: .55s; }
+.t-arrow .sym { color: var(--ink-2); display: flex; align-items: center; height: 1.1em; }
+.op { font-weight: 500; color: var(--ink-2); line-height: 1.1; }
+.tok .cap { font-size: max(11px, .19em); line-height: 1.2; color: var(--ink-2); text-align: center; max-width: 6.4em; margin-top: .35em; font-variation-settings: "CASL" .6; }
+.equation figcaption { margin-top: 12px; font-size: .95rem; color: var(--ink-2); max-width: 64ch; }
+
+/* ---------- tabs (binder tabs) ---------- */
+.tabs {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  max-width: 1120px; margin: 18px auto 0; padding: 8px 18px 0;
+  background: linear-gradient(var(--paper) 78%, transparent);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 1 1 0; min-width: 0; text-align: left;
+  border: 1px solid var(--rule); border-bottom: none; border-radius: 10px 10px 0 0;
+  background: var(--sheet-2); color: var(--ink-2);
+  padding: 9px 10px 8px; font-weight: 700; font-size: .95rem; line-height: 1.2;
+  display: flex; flex-direction: column;
+}
+.tab span { font-weight: 400; font-size: .72rem; color: var(--ink-3); line-height: 1.25; margin-top: 2px; }
+.tab[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: inset 0 3px 0 var(--ink); }
+.tab[aria-selected="true"] span { color: var(--ink-2); }
+
+/* ---------- panels ---------- */
+main { max-width: 1120px; margin: 0 auto; padding: 0 18px 40px; }
+.panel { background: var(--sheet); border: 1px solid var(--rule); border-radius: 0 0 var(--radius-m) var(--radius-m); box-shadow: var(--shadow); padding: 20px 16px 24px; }
+.panel[hidden] { display: none; }
+.intro { max-width: 68ch; margin-bottom: 18px; }
+.intro h2 { font-size: 1.7rem; font-weight: 850; font-variation-settings: "CASL" 1, "slnt" -4; margin-bottom: 8px; letter-spacing: -.02em; }
+.intro p { color: var(--ink-2); }
+.note { font-size: .88rem; color: var(--ink-2); margin: 6px 0 0; }
+.field { margin: 0 0 14px; }
+.field-name { display: block; font-size: .86rem; font-weight: 650; color: var(--ink-2); margin-bottom: 6px; }
+.mini-cap { display: block; font-size: .8rem; color: var(--ink-2); margin-bottom: 4px; line-height: 1.3; }
+
+/* ---------- controls ---------- */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; background: var(--sheet-2); border: 1px solid var(--rule); border-radius: 999px; max-width: 100%; }
+.seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 999px; font-size: .88rem; font-weight: 600; color: var(--ink-2); min-height: 36px; }
+.seg button[aria-pressed="true"] { background: var(--btn); color: var(--btn-ink); }
+.seg button:disabled { opacity: .45; cursor: not-allowed; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.chip { flex: 0 0 auto; border: 1px solid var(--rule); background: var(--sheet-2); border-radius: 999px; padding: 7px 12px; font-size: .86rem; font-weight: 600; min-height: 36px; }
+.chip[aria-pressed="true"] { border-color: var(--ink); background: color-mix(in srgb, var(--guess-soft) 30%, var(--sheet)); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.btn { border: 1.5px solid var(--ink); background: transparent; color: var(--ink); border-radius: 8px; padding: 8px 14px; font-weight: 700; font-size: .92rem; min-height: 40px; }
+.btn.primary { background: var(--btn); color: var(--btn-ink); }
+.btn.quiet { border-color: var(--rule); font-weight: 600; color: var(--ink-2); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.toggles { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.toggle { display: flex; align-items: center; gap: 10px; font-size: .9rem; cursor: pointer; min-height: 32px; }
+.toggle input { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--bar-idle); position: relative; flex: 0 0 auto; transition: background .15s; margin: 0; }
+.toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sheet); transition: transform .15s; }
+.toggle input:checked { background: var(--btn); }
+.toggle input:checked::after { transform: translateX(16px); }
+
+.knobs { display: grid; gap: 12px; margin: 10px 0; }
+.knobs.two { grid-template-columns: 1fr; }
+.knob { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; }
+.knob .k-name { font-size: .9rem; font-weight: 650; }
+.knob output { font-size: .9rem; font-variation-settings: "MONO" 1; font-feature-settings: "tnum" 1; }
+.knob .k-hint { grid-column: 1 / -1; font-size: .8rem; color: var(--ink-2); line-height: 1.35; }
+.knob input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--ink); height: 28px; margin: 0; }
+
+.drawer { margin-top: 16px; border-top: 1px dashed var(--rule); padding-top: 10px; }
+.drawer summary { cursor: pointer; font-weight: 700; padding: 6px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+.drawer summary::-webkit-details-marker { display: none; }
+.drawer summary::before { content: ""; width: 0; height: 0; border-left: 6px solid var(--ink); border-top: 5px solid transparent; border-bottom: 5px solid transparent; transition: transform .15s; }
+.drawer[open] summary::before { transform: rotate(90deg); }
+
+/* ---------- the arcade screen ---------- */
+.screen { background: var(--screen); border: 1px solid var(--screen-edge); border-radius: 14px; padding: 10px; margin-bottom: 14px; color: var(--screen-ink); }
+.screen-note, .screen-status { font-size: .82rem; color: #aab6d3; margin: 8px 2px 0; min-height: 1.3em; line-height: 1.35; }
+.screen-status { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.seg-screen { margin-top: 10px; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
+.seg-screen button { color: #aab6d3; }
+.seg-screen button[aria-pressed="true"] { background: #e8ecf6; color: #0c1530; }
+
+.maze {
+  --cols: 9; --rows: 7;
+  position: relative; display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  width: 100%; max-width: 440px; margin: 0 auto;
+  aspect-ratio: var(--cols) / var(--rows);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.maze.mini { max-width: 150px; margin: 0; }
+.cell { position: relative; }
+.cell.wall::before { content: ""; position: absolute; inset: 14%; border: 2px solid var(--wall-hi); border-radius: 22%; background: color-mix(in srgb, var(--wall) 55%, transparent); }
+.maze.mini .cell.wall::before { border-width: 1px; }
+.cell.edge.wall::before { opacity: .45; }
+.cell.floor { background: transparent; border: 0; padding: 0; border-radius: 6px; display: block; }
+button.cell.floor { cursor: pointer; }
+button.cell.floor:hover { background: rgba(255,255,255,.05); }
+.tint { position: absolute; inset: 3%; border-radius: 22%; background: transparent; transition: background-color .25s; }
+.pellet { position: absolute; left: 50%; top: 50%; width: 16%; height: 16%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--pellet); box-shadow: 0 0 6px rgba(255, 217, 160, .5); }
+.pellet[hidden] { display: none; }
+.cval { position: absolute; left: 0; right: 0; bottom: 4%; text-align: center; font-size: clamp(8px, 2.3vw, 11px); font-variation-settings: "MONO" 1; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); pointer-events: none; }
+.carr { position: absolute; left: 50%; top: 40%; width: 34%; height: 34%; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); pointer-events: none; opacity: .9; }
+.carr::before { content: ""; position: absolute; inset: 0; background: #fff; clip-path: polygon(50% 0, 100% 70%, 62% 70%, 62% 100%, 38% 100%, 38% 70%, 0 70%); }
+.maze.mini .cval, .maze.mini .carr { display: none; }
+
+.actor { position: absolute; left: 0; top: 0; width: calc(100% / var(--cols)); height: calc(100% / var(--rows)); pointer-events: none; transition: transform .11s linear; }
+.maze.instant .actor, .tank.instant .actor { transition: none; }
+.pac::before { content: ""; position: absolute; inset: 13%; border-radius: 50%; background: conic-gradient(var(--pac) 0 62deg, transparent 62deg 118deg, var(--pac) 118deg 360deg); transform: rotate(var(--rot, 0deg)); filter: drop-shadow(0 0 4px rgba(255, 210, 63, .45)); }
+.pac.dead::before { background: conic-gradient(var(--pac) 0 150deg, transparent 150deg 210deg, var(--pac) 210deg); opacity: .45; }
+.ghost::before { content: ""; position: absolute; inset: 14% 14% 12%; background: var(--ghost); border-radius: 50% 50% 18% 18% / 58% 58% 18% 18%; box-shadow: 0 0 8px rgba(255, 90, 95, .45); }
+.ghost::after { content: ""; position: absolute; left: 27%; right: 27%; top: 34%; height: 22%; background: radial-gradient(circle at 25% 50%, #0c1530 0 18%, #fff 19% 42%, transparent 43%), radial-gradient(circle at 75% 50%, #0c1530 0 18%, #fff 19% 42%, transparent 43%); }
+.ghost.trail { opacity: .22; }
+.ghost.trail::after { display: none; }
+.ghost[hidden], .pac[hidden] { display: none; }
+.pick-ring { position: absolute; inset: 4%; border-radius: 26%; box-shadow: inset 0 0 0 2px var(--guess-soft); pointer-events: none; }
+
+/* ---------- bench ---------- */
+.bench-grid > *, .tank-grid > *, .arcade-grid > *, .bench-left > * { min-width: 0; }
+.bench-grid { display: grid; gap: 20px; }
+.move-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.pad { display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap: 4px; }
+.pad button { border: 1.5px solid var(--rule); background: var(--sheet-2); border-radius: 10px; padding: 0; display: grid; place-items: center; }
+.pad svg { width: 22px; height: 22px; fill: var(--ink-2); }
+.pad button[aria-pressed="true"] { background: var(--guess-soft); border-color: var(--guess); }
+.pad button[aria-pressed="true"] svg { fill: #16263a; }
+.p-up { grid-column: 2; grid-row: 1; } .p-left { grid-column: 1; grid-row: 2; } .p-right { grid-column: 3; grid-row: 2; } .p-down { grid-column: 2; grid-row: 3; }
+.outcome { flex: 1 1 150px; min-width: 150px; }
+.outcome .maze.mini { background: var(--screen); border-radius: 8px; padding: 3px; border: 1px solid var(--screen-edge); }
+.reward-parts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.rpart { font-size: .78rem; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule); font-variation-settings: "MONO" 1; }
+.rpart.neg { color: var(--gap); border-color: color-mix(in srgb, var(--gap) 40%, var(--rule)); }
+.rpart.pos { color: var(--target); border-color: color-mix(in srgb, var(--target) 40%, var(--rule)); }
+.rpart.end { background: var(--ink); color: var(--sheet); border-color: var(--ink); font-variation-settings: "MONO" 0; font-weight: 700; }
+.reward-line { font-size: .95rem; margin: 10px 0 0; }
+
+/* worked solution: numbered steps in the notebook margin */
+.worked { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+.step { counter-increment: step; position: relative; padding: 14px 0 16px 44px; border-top: 1px solid var(--rule); }
+.step::before {
+  content: counter(step); position: absolute; left: 0; top: 12px;
+  width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--ink);
+  display: grid; place-items: center; font-weight: 800; font-size: .95rem; font-variation-settings: "CASL" 1;
+}
+.step::after { content: ""; position: absolute; left: 36px; top: 0; bottom: 0; width: 1px; background: var(--margin-line); opacity: .7; }
+.step h3 { font-size: 1.18rem; font-weight: 800; margin-bottom: 6px; font-variation-settings: "CASL" .8; }
+.step p { font-size: .94rem; color: var(--ink-2); }
+.readout { font-size: 1.08rem; color: var(--ink) !important; margin: 8px 0 0; }
+.readout b { font-size: 1.25rem; }
+
+.qbars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; height: 150px; max-width: 360px; margin-top: 6px; }
+.qbars.small { height: 104px; gap: 6px; }
+.qb { display: grid; grid-template-rows: 1fr auto; min-width: 0; }
+.qb-track { position: relative; }
+.qb-zero { position: absolute; left: -2px; right: -2px; height: 1px; background: var(--ink-3); }
+.qb-bar { position: absolute; left: 12%; right: 12%; border-radius: 4px; background: var(--bar-idle); transition: top .25s, height .25s, background-color .2s; }
+.qb-bar.guess { background: var(--guess-soft); box-shadow: inset 0 0 0 1.5px var(--guess); }
+.qb-bar.frozen { background: color-mix(in srgb, var(--frozen) 75%, transparent); }
+.qb-bar.live { background: color-mix(in srgb, var(--live) 70%, transparent); }
+.qb-val { position: absolute; left: -6px; right: -6px; text-align: center; font-size: .74rem; font-variation-settings: "MONO" 1; font-weight: 650; color: var(--ink); transition: top .25s; white-space: nowrap; }
+.qbars.instant .qb-bar, .qbars.instant .qb-val { transition: none; }
+.qbars.small .qb-val { font-size: .68rem; }
+.qb-name { text-align: center; font-size: .74rem; color: var(--ink-2); padding-top: 4px; }
+.qb-name .star { color: var(--target); font-weight: 800; }
+.qbars.small .qb-name .w { display: none; }
+.qbars.small .qb-name { font-size: .9rem; line-height: 1.1; }
+.qb-name.hi { color: var(--ink); font-weight: 800; }
+.screen .qbars { --ink: #e8ecf6; }
+.future-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px; }
+.future-pair.single { grid-template-columns: 1fr; }
+.future-pair[hidden] { display: none; }
+.game-over { margin-top: 8px; padding: 10px 12px; border: 1.5px dashed var(--ink-3); border-radius: 8px; font-size: .92rem; }
+.game-over[hidden] { display: none; }
+
+.formula { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: baseline; font-size: 1.12rem; margin: 8px 0 4px; }
+.formula .lhs { color: var(--ink-2); font-size: .95rem; text-align: right; }
+.formula .rhs { font-variation-settings: "MONO" 1; font-feature-settings: "tnum" 1; }
+.formula .rhs .v { padding: 0 .15em; border-radius: .2em; }
+.formula .total { font-size: 1.5rem; font-weight: 800; color: var(--target); }
+.formula .dim { color: var(--ink-3); }
+
+.gapviz { position: relative; height: 96px; margin: 12px 0 6px; max-width: 420px; }
+.gv-axis { position: absolute; top: 0; bottom: 20px; width: 1px; background: var(--ink-3); }
+.gv-axis-label { position: absolute; bottom: 0; font-size: .7rem; color: var(--ink-3); transform: translateX(-50%); }
+.gv-bar { position: absolute; height: 22px; border-radius: 4px; transition: left .3s, width .3s; }
+.gv-bar.g { top: 4px; background: var(--guess-soft); box-shadow: inset 0 0 0 1.5px var(--guess); }
+.gv-bar.t { top: 34px; background: color-mix(in srgb, var(--target) 80%, transparent); }
+.gv-lab { position: absolute; font-size: .74rem; font-weight: 700; white-space: nowrap; transition: left .3s; line-height: 22px; }
+.gv-lab.inside { background: var(--sheet); padding: 0 6px; border-radius: 4px; line-height: 18px; margin-top: 2px; box-shadow: 0 0 0 1px var(--rule); }
+.gv-gap { position: absolute; top: 0; height: 60px; border-left: 2px dashed var(--gap); border-right: 2px dashed var(--gap); background: color-mix(in srgb, var(--gap) 12%, transparent); transition: left .3s, width .3s; }
+
+.chart-wrap { position: relative; height: 150px; margin-top: 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--sheet-2); }
+.chart-wrap.tall { height: 190px; }
+.chart-wrap canvas { width: 100%; height: 100%; display: block; }
+
+/* ---------- tank ---------- */
+.tank-grid { display: grid; gap: 20px; }
+.tank {
+  --cols: 7; --rows: 6;
+  position: relative; display: grid; grid-template-columns: repeat(var(--cols), 1fr);
+  width: 100%; max-width: 440px; margin: 0 auto; aspect-ratio: var(--cols) / var(--rows);
+  gap: 3px; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.tcell { position: relative; border: 0; padding: 0; border-radius: 7px; background: #111c3d; overflow: hidden; }
+.tcell.wall { background: repeating-linear-gradient(135deg, #2745a8 0 5px, #1e3786 5px 10px); }
+.tcell .tint { inset: 0; border-radius: 0; }
+.tcell .icon { position: absolute; inset: 18%; }
+.tcell.cherry .icon { background: radial-gradient(circle at 30% 68%, #ff4f6d 0 22%, transparent 23%), radial-gradient(circle at 70% 68%, #ff4f6d 0 22%, transparent 23%), linear-gradient(35deg, transparent 46%, #6fdc7a 47% 53%, transparent 54%) 0 -8% / 100% 70% no-repeat, linear-gradient(-35deg, transparent 46%, #6fdc7a 47% 53%, transparent 54%) 0 -8% / 100% 70% no-repeat; }
+.tcell.ghostc .icon::before { content: ""; position: absolute; inset: 4% 8% 2%; background: var(--ghost); border-radius: 50% 50% 16% 16% / 58% 58% 16% 16%; }
+.tcell.ghostc .icon::after { content: ""; position: absolute; left: 24%; right: 24%; top: 30%; height: 24%; background: radial-gradient(circle at 25% 50%, #0c1530 0 18%, #fff 19% 42%, transparent 43%), radial-gradient(circle at 75% 50%, #0c1530 0 18%, #fff 19% 42%, transparent 43%); }
+.tcell .cval { bottom: 3px; }
+.tcell .carr { top: 42%; }
+.tcell.flash-guess { box-shadow: inset 0 0 0 3px var(--guess-soft); }
+.tcell.flash-next { box-shadow: inset 0 0 0 3px var(--heat-pos); }
+.tank .actor { transition: transform .12s linear; }
+.tank .pac::before { inset: 22%; }
+.legend-bar { display: flex; align-items: center; gap: 6px; justify-content: center; margin-top: 8px; font-size: .72rem; color: #aab6d3; font-variation-settings: "MONO" 1; }
+.legend-bar i { display: block; width: 70px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--heat-neg), transparent); }
+.legend-bar i.pos { background: linear-gradient(90deg, transparent, var(--heat-pos)); }
+.last-update { min-height: 64px; padding: 10px 12px; border-left: 3px solid var(--ink); background: var(--sheet-2); border-radius: 0 8px 8px 0; font-size: .92rem; margin: 4px 0 14px; }
+.last-update .num { font-weight: 700; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0 0 14px; }
+.stats div { border-bottom: 1px dotted var(--rule); padding-bottom: 4px; min-width: 0; }
+.stats dt { font-size: .76rem; color: var(--ink-2); }
+.stats dd { margin: 0; font-size: 1.08rem; font-weight: 700; font-variation-settings: "MONO" 1; font-feature-settings: "tnum" 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tries { margin-top: 18px; }
+.tries h3, .experiments h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; font-variation-settings: "CASL" .8; }
+.tries ul { margin: 0; padding-left: 1.1em; }
+.tries li { margin-bottom: 8px; font-size: .93rem; color: var(--ink-2); }
+.tries li b { color: var(--ink); }
+
+/* ---------- arcade ---------- */
+.arcade-grid { display: grid; gap: 18px; }
+.experiments { margin-top: 20px; border-top: 1px dashed var(--rule); padding-top: 16px; }
+.exp-list { display: grid; gap: 10px; margin-top: 12px; }
+.exp { border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 12px 14px; background: var(--sheet-2); }
+.exp h4 { margin: 0 0 4px; font-size: 1rem; font-weight: 800; }
+.exp p { font-size: .88rem; color: var(--ink-2); margin: 0 0 6px; }
+.exp p.watch { color: var(--ink); }
+.exp p.watch::before { content: "Watch for: "; font-weight: 700; }
+.exp .btn { margin-top: 4px; }
+
+.foot { max-width: 1120px; margin: 0 auto; padding: 0 18px 32px; font-size: .85rem; color: var(--ink-2); }
+.foot p { max-width: 70ch; }
+
+/* ---------- wider screens ---------- */
+@media (min-width: 760px) {
+  .hero { padding-top: 48px; }
+  .panel { padding: 28px 28px 32px; }
+  .knobs.two { grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .exp-list { grid-template-columns: repeat(2, 1fr); }
+  .tab { flex: 0 0 auto; padding: 10px 18px 9px; }
+}
+@media (min-width: 980px) {
+  .bench-grid { grid-template-columns: minmax(360px, 440px) 1fr; gap: 36px; align-items: start; }
+  .bench-left { position: sticky; top: 84px; }
+  .tank-grid { grid-template-columns: minmax(340px, 460px) 1fr; gap: 36px; align-items: start; }
+  .arcade-grid { grid-template-columns: minmax(340px, 440px) 1fr; gap: 36px; align-items: start; }
+  .exp-list { grid-template-columns: repeat(3, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1 class="title">The DQN Workshop</h1>
+  <p class="lede">A Deep Q-Network learns by grading its own guesses. After every move it asks one question: how far off was my guess, compared with what actually happened plus my guess about what happens next? Then it nudges its weights to shrink that gap. The three stations below let you poke at that loop until it clicks.</p>
+
+  <figure class="equation" aria-label="The update rule: the guess q is nudged toward r plus gamma times v">
+    <div class="eq-row">
+      <span class="tok t-guess"><span class="sym">q</span><span class="cap">the guess</span></span>
+      <span class="tok t-arrow" aria-hidden="true"><span class="sym"><svg viewBox="0 0 60 24" width="1.6em" height="0.64em"><path d="M58 12H6M16 3 5 12l11 9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="cap">nudged toward</span></span>
+      <span class="tok t-reward"><span class="sym">r</span><span class="cap">reward you got</span></span>
+      <span class="op">+</span>
+      <span class="tok t-gamma"><span class="sym">γ</span><span class="cap">future discount</span></span>
+      <span class="op">·</span>
+      <span class="tok t-frozen"><span class="sym">v</span><span class="cap">value of where you land</span></span>
+    </div>
+    <figcaption>Everything right of the arrow is the <span class="hl hl-target">target</span>. The distance between the guess and the target is the <span class="hl hl-gap">gap</span>. Learning is nothing more than shrinking that gap, millions of times. Colors stay the same on every station: <span class="hl hl-live">live network</span>, <span class="hl hl-frozen">frozen copy</span>.</figcaption>
+  </figure>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Stations">
+  <button class="tab" role="tab" id="tab-bench" aria-controls="panel-bench" aria-selected="true">The Bench<span>one update, up close</span></button>
+  <button class="tab" role="tab" id="tab-tank" aria-controls="panel-tank" aria-selected="false" tabindex="-1">Ripple Tank<span>truth flows backward</span></button>
+  <button class="tab" role="tab" id="tab-arcade" aria-controls="panel-arcade" aria-selected="false" tabindex="-1">Arcade<span>train a whole agent</span></button>
+</nav>
+
+<main>
+<!-- ============================================================ BENCH -->
+<section class="panel" id="panel-bench" role="tabpanel" aria-labelledby="tab-bench">
+  <div class="intro">
+    <h2>The Bench</h2>
+    <p>Set up one moment of the game, pick a move, and watch a single update happen with real numbers from a real network. Change anything (the board, the move, a knob) and the whole worked solution recomputes.</p>
+  </div>
+
+  <div class="bench-grid">
+    <div class="bench-left">
+      <div class="field">
+        <span class="field-name" id="lbl-brain">Brain</span>
+        <div class="seg" id="bench-brain" role="group" aria-labelledby="lbl-brain">
+          <button data-v="trained" aria-pressed="true">Trained</button>
+          <button data-v="fresh" aria-pressed="false">Fresh</button>
+          <button data-v="arcade" aria-pressed="false">From Arcade</button>
+        </div>
+        <p class="note" id="bench-brain-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-name">Try a situation</span>
+        <div class="chips" id="bench-scenarios"></div>
+      </div>
+
+      <div class="screen">
+        <div class="maze" id="bench-board" aria-label="Game board. Tap a square to edit it."></div>
+        <div class="seg seg-screen" id="bench-overlay" role="group" aria-label="What to show on the board">
+          <button data-v="game" aria-pressed="true">Game</button>
+          <button data-v="value" aria-pressed="false">Value map</button>
+          <button data-v="ripple" aria-pressed="false">Ripple</button>
+        </div>
+        <p class="screen-note" id="bench-overlay-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-name" id="lbl-tool">Tapping a square will</span>
+        <div class="seg" id="bench-tool" role="group" aria-labelledby="lbl-tool">
+          <button data-v="pac" aria-pressed="true">Move Pac-Man</button>
+          <button data-v="ghost" aria-pressed="false">Move ghost</button>
+          <button data-v="pellet" aria-pressed="false">Add or remove a pellet</button>
+        </div>
+      </div>
+
+      <div class="move-row">
+        <div class="field">
+          <span class="field-name" id="lbl-move">Pick a move</span>
+          <div class="pad" id="bench-pad" role="group" aria-labelledby="lbl-move">
+            <button data-a="0" aria-label="Up" class="p-up"><svg viewBox="0 0 24 24"><path d="M12 5 4 16h16z"/></svg></button>
+            <button data-a="2" aria-label="Left" class="p-left"><svg viewBox="0 0 24 24"><path d="M5 12 16 4v16z"/></svg></button>
+            <button data-a="3" aria-label="Right" class="p-right"><svg viewBox="0 0 24 24"><path d="M19 12 8 4v16z"/></svg></button>
+            <button data-a="1" aria-label="Down" class="p-down"><svg viewBox="0 0 24 24"><path d="M12 19 4 8h16z"/></svg></button>
+          </div>
+        </div>
+        <div class="outcome">
+          <span class="field-name">What happened (S′)</span>
+          <div class="maze mini" id="bench-next" aria-hidden="true"></div>
+          <div class="reward-parts" id="bench-parts"></div>
+        </div>
+      </div>
+      <p class="reward-line" id="bench-rline"></p>
+
+      <details class="drawer">
+        <summary>Change the rewards</summary>
+        <p class="note">Game points. They are multiplied by 0.01 before training, so a pellet (+10) becomes +0.10. These only affect the Bench.</p>
+        <div class="knobs" id="bench-reward-knobs"></div>
+        <button class="btn quiet" id="bench-reward-reset">Reset rewards</button>
+      </details>
+    </div>
+
+    <ol class="worked" id="bench-worked">
+      <li class="step">
+        <h3>The guess</h3>
+        <p>The <span class="hl hl-live">live network</span> looks at board S and scores all four moves. Only the move you picked gets graded.</p>
+        <div class="qbars" id="bars-guess"></div>
+        <p class="readout">q(S, <span id="ro-move"></span>) = <b class="num c-guess" id="ro-q"></b></p>
+      </li>
+      <li class="step">
+        <h3>Peek at the future</h3>
+        <p id="future-text"></p>
+        <div class="future-pair" id="future-pair">
+          <div><span class="mini-cap" id="cap-picker">Live network picks the best next move</span><div class="qbars small" id="bars-pick"></div></div>
+          <div><span class="mini-cap" id="cap-valuer">Frozen copy says what it is worth</span><div class="qbars small" id="bars-value"></div></div>
+        </div>
+        <div class="game-over" id="future-over" hidden>The game ended on this move, so there is no future to add. v = 0.</div>
+        <p class="readout">v = <b class="num c-frozen" id="ro-v"></b></p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="bench-frozen" checked><span>Use a frozen copy for v</span></label>
+          <label class="toggle"><input type="checkbox" id="bench-double" checked><span>Double DQN (live picks, frozen scores)</span></label>
+        </div>
+      </li>
+      <li class="step">
+        <h3>The target</h3>
+        <p>What q should have been, in hindsight: the reward you actually got, plus the discounted value of where you ended up.</p>
+        <div class="formula" id="bench-formula"></div>
+        <div class="knobs" id="bench-gamma-knob"></div>
+      </li>
+      <li class="step">
+        <h3>The gap</h3>
+        <p>Guess against target. This single number is what the whole network gets adjusted to shrink.</p>
+        <div class="gapviz" id="bench-gapviz"></div>
+        <p class="readout">gap = <b class="num c-gap" id="ro-gap"></b> &nbsp; loss = <b class="num" id="ro-loss"></b></p>
+        <p class="note" id="gap-words"></p>
+      </li>
+      <li class="step">
+        <h3>Nudge the weights</h3>
+        <p>Backpropagation works out, for every one of the network’s <span id="param-count"></span> weights, which direction would move q toward the target. Each nudge moves every weight a tiny step that way.</p>
+        <div class="knobs" id="bench-lr-knob"></div>
+        <div class="btn-row">
+          <button class="btn primary" data-nudge="1">Nudge once</button>
+          <button class="btn" data-nudge="10">Nudge ×10</button>
+          <button class="btn" data-nudge="100">Nudge ×100</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn quiet" id="bench-sync">Sync frozen copy</button>
+          <button class="btn quiet" id="bench-undo">Undo all nudges</button>
+        </div>
+        <div class="chart-wrap"><canvas id="bench-chart" aria-label="Chart of the guess and target over nudges"></canvas></div>
+        <p class="note" id="nudge-words">Press a nudge button to watch the guess move toward the target.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================ TANK -->
+<section class="panel" id="panel-tank" role="tabpanel" aria-labelledby="tab-tank" hidden>
+  <div class="intro">
+    <h2>Ripple Tank</h2>
+    <p>A simpler world: one cherry worth +10, one ghost worth −10. At the start no square knows anything, so the map is blank. The only true information enters where rewards happen, then leaks backward into the guesses, one step at a time.</p>
+  </div>
+  <div class="tank-grid">
+    <div class="tank-left">
+      <div class="screen">
+        <div class="tank" id="tank-board" aria-label="Grid world. Tap a square to edit it."></div>
+        <div class="legend-bar"><span>−10</span><i></i><span>0</span><i class="pos"></i><span>+10</span></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="tank-run">Explore</button>
+        <button class="btn" id="tank-step">One step</button>
+        <button class="btn" id="tank-sweep">Sweep</button>
+        <button class="btn quiet" id="tank-reset">Forget everything</button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-ttool">Tapping a square will place</span>
+        <div class="seg" id="tank-tool" role="group" aria-labelledby="lbl-ttool">
+          <button data-v="2" aria-pressed="false">Cherry</button>
+          <button data-v="3" aria-pressed="false">Ghost</button>
+          <button data-v="1" aria-pressed="true">Wall</button>
+          <button data-v="0" aria-pressed="false">Empty</button>
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="tank-nums"><span>Show the numbers</span></label>
+    </div>
+    <div class="tank-right">
+      <div class="field">
+        <span class="field-name" id="lbl-tbrain">Brain</span>
+        <div class="seg" id="tank-brain" role="group" aria-labelledby="lbl-tbrain">
+          <button data-v="table" aria-pressed="true">Table</button>
+          <button data-v="net" aria-pressed="false">Network</button>
+        </div>
+        <p class="note" id="tank-brain-note"></p>
+      </div>
+      <div class="last-update" id="tank-last" aria-live="polite"></div>
+      <dl class="stats" id="tank-stats"></dl>
+      <div class="knobs" id="tank-knobs"></div>
+      <div class="tries">
+        <h3>Things to try</h3>
+        <ul>
+          <li>Press <b>Sweep</b> a few times. Each sweep grades every square once, against a frozen snapshot of the previous sweep, and the color spreads exactly one square further from the cherry. That is the reward leaking backward.</li>
+          <li>Slide <b>future discount</b> down to 0.5. Far squares barely care about the cherry anymore: the glow fades fast with distance.</li>
+          <li>Switch to <b>Network</b> and press One step. A single update tints many squares at once, because they share weights. That sharing is why DQN uses a network: it can guess about squares it has never visited.</li>
+          <li>After it has learned, move the cherry. Watch the old knowledge get overwritten.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ARCADE -->
+<section class="panel" id="panel-arcade" role="tabpanel" aria-labelledby="tab-arcade" hidden>
+  <div class="intro">
+    <h2>Arcade</h2>
+    <p>Now the whole machine: a brand-new network plays this maze, stores every moment in a replay memory, and learns from random handfuls of it using exactly the update from the Bench. It starts out walking into walls and ghosts. Keep an eye on the exam line under the stats: expect it to start climbing after roughly 20,000 steps, a few minutes on Turbo. Or load the trained brain to skip ahead.</p>
+  </div>
+  <div class="arcade-grid">
+    <div class="arcade-left">
+      <div class="screen">
+        <div class="maze" id="arcade-board" aria-label="The agent playing"></div>
+        <div class="screen-status" id="arcade-status"></div>
+      </div>
+      <div class="field">
+        <span class="mini-cap">What the <span class="hl hl-live">live network</span> thinks of each move right now</span>
+        <div class="qbars small" id="arcade-q"></div>
+      </div>
+    </div>
+    <div class="arcade-right">
+      <div class="btn-row">
+        <button class="btn primary" id="arc-train">Start training</button>
+        <button class="btn" id="arc-test">Test drive</button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-speed">Speed</span>
+        <div class="seg" id="arc-speed" role="group" aria-labelledby="lbl-speed">
+          <button data-v="watch" aria-pressed="true">Watch</button>
+          <button data-v="fast" aria-pressed="false">Fast</button>
+          <button data-v="turbo" aria-pressed="false">Turbo</button>
+        </div>
+      </div>
+      <dl class="stats" id="arc-stats"></dl>
+      <div class="chart-wrap tall"><canvas id="arc-chart" aria-label="Score per game while training"></canvas></div>
+      <p class="note">The line is the <span class="hl hl-live">exam</span>: every 2,500 steps the agent plays the same 10 games with no random moves and no learning, which shows what it has really learned. Dots are practice games, which include random moves. Dashed line: random play.</p>
+      <div class="btn-row">
+        <button class="btn quiet" id="arc-load">Load the trained brain</button>
+        <button class="btn quiet" id="arc-send">Send this brain to the Bench</button>
+        <button class="btn quiet" id="arc-reset">Start over</button>
+      </div>
+    </div>
+  </div>
+
+  <details class="drawer" id="arc-knob-drawer">
+    <summary>Knobs</summary>
+    <div class="knobs two" id="arc-knobs"></div>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="arc-replay" checked><span>Replay memory</span></label>
+      <label class="toggle"><input type="checkbox" id="arc-frozen" checked><span>Frozen copy</span></label>
+      <label class="toggle"><input type="checkbox" id="arc-double" checked><span>Double DQN</span></label>
+    </div>
+    <button class="btn quiet" id="arc-defaults">Restore default knobs</button>
+  </details>
+
+  <div class="experiments">
+    <h3>Experiments</h3>
+    <p class="note">Each one changes a knob and marks the moment on the chart so you can see the effect. Run them on a brain that is already learning (or load the trained one) and give each a minute on Turbo.</p>
+    <div class="exp-list" id="arc-experiments"></div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <p>Built from scratch for this page: an 11,908-weight network with hand-written backpropagation, Adam, replay memory, a frozen target copy and Double DQN, all running in your browser. Same algorithm as the pacdqn project, smaller maze.</p>
+</footer>
+
+<script>/* DQN Workshop engine: a tiny neural net, two environments and a DQN.
+   Pure JS, no dependencies. Runs in the browser and in Node (for tests). */
+const Engine = (() => {
+  'use strict';
+
+  // ------------------------------------------------------------------ RNG
+  function makeRng(seed) {
+    let s = (seed >>> 0) || 1;
+    const next = () => {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    next.int = (n) => Math.floor(next() * n);
+    next.normal = () => {
+      let u = 0;
+      while (u === 0) u = next();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * next());
+    };
+    next.pick = (arr) => arr[Math.floor(next() * arr.length)];
+    return next;
+  }
+
+  const ACTIONS = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // up, down, left, right  (dy, dx)
+  const ACTION_NAMES = ['up', 'down', 'left', 'right'];
+  const OPPOSITE = [1, 0, 3, 2];
+
+  function argmax(a) {
+    let bi = 0;
+    for (let i = 1; i < a.length; i++) if (a[i] > a[bi]) bi = i;
+    return bi;
+  }
+
+  // Huber (smooth L1) with delta = 1
+  function huber(x) { const ax = Math.abs(x); return ax < 1 ? 0.5 * x * x : ax - 0.5; }
+  function huberGrad(x) { return x > 1 ? 1 : x < -1 ? -1 : x; }
+
+  // ------------------------------------------------------------------ MLP
+  class MLP {
+    constructor(sizes, seed = 1, outScale = 0.1) {
+      this.sizes = sizes.slice();
+      this.L = sizes.length - 1;
+      this.W = []; this.b = [];
+      const rng = makeRng(seed);
+      for (let l = 0; l < this.L; l++) {
+        const nin = sizes[l], nout = sizes[l + 1];
+        const W = new Float32Array(nin * nout);
+        const std = Math.sqrt(2 / nin) * (l === this.L - 1 ? outScale : 1);
+        for (let i = 0; i < W.length; i++) W[i] = rng.normal() * std;
+        this.W.push(W);
+        this.b.push(new Float32Array(nout));
+      }
+      this._alloc();
+    }
+    _alloc() {
+      this.acts = this.sizes.map((n) => new Float32Array(n));
+      this.deltas = this.sizes.map((n) => new Float32Array(n));
+      this.gW = this.W.map((w) => new Float32Array(w.length));
+      this.gb = this.b.map((b) => new Float32Array(b.length));
+      this.m = null; this.v = null; this.t = 0;
+    }
+    get paramCount() { let n = 0; for (let l = 0; l < this.L; l++) n += this.W[l].length + this.b[l].length; return n; }
+
+    // Forward one input. Activations are cached for a following backward().
+    forward(x) {
+      const a0 = this.acts[0];
+      for (let i = 0; i < a0.length; i++) a0[i] = x[i];
+      for (let l = 0; l < this.L; l++) {
+        const nin = this.sizes[l], nout = this.sizes[l + 1];
+        const W = this.W[l], b = this.b[l], ain = this.acts[l], aout = this.acts[l + 1];
+        const last = l === this.L - 1;
+        // Collect non-zero inputs once (inputs are sparse one-hots; hidden ReLUs are ~half zero).
+        let nz = 0; const idx = this._nz || (this._nz = new Int32Array(Math.max(...this.sizes)));
+        for (let i = 0; i < nin; i++) if (ain[i] !== 0) idx[nz++] = i;
+        for (let j = 0; j < nout; j++) {
+          let s = b[j]; const off = j * nin;
+          for (let k = 0; k < nz; k++) { const i = idx[k]; s += W[off + i] * ain[i]; }
+          aout[j] = last ? s : (s > 0 ? s : 0);
+        }
+      }
+      return Float32Array.from(this.acts[this.L]);
+    }
+
+    // Accumulate gradients of sum_j dOut[j]*out_j w.r.t. every weight (backprop).
+    backward(dOut) {
+      const dl = this.deltas[this.L];
+      for (let j = 0; j < dl.length; j++) dl[j] = dOut[j];
+      for (let l = this.L - 1; l >= 0; l--) {
+        const nin = this.sizes[l], nout = this.sizes[l + 1];
+        const W = this.W[l], gW = this.gW[l], gb = this.gb[l], ain = this.acts[l];
+        const dout = this.deltas[l + 1], din = this.deltas[l];
+        if (l > 0) din.fill(0);
+        for (let j = 0; j < nout; j++) {
+          const dj = dout[j];
+          if (dj === 0) continue;
+          gb[j] += dj;
+          const off = j * nin;
+          if (l > 0) {
+            for (let i = 0; i < nin; i++) { gW[off + i] += dj * ain[i]; din[i] += W[off + i] * dj; }
+          } else {
+            for (let i = 0; i < nin; i++) { const a = ain[i]; if (a !== 0) gW[off + i] += dj * a; }
+          }
+        }
+        if (l > 0) for (let i = 0; i < nin; i++) if (ain[i] <= 0) din[i] = 0;
+      }
+    }
+
+    gradNorm() {
+      let s = 0;
+      for (let l = 0; l < this.L; l++) {
+        for (const g of this.gW[l]) s += g * g;
+        for (const g of this.gb[l]) s += g * g;
+      }
+      return Math.sqrt(s);
+    }
+    zeroGrad() { for (let l = 0; l < this.L; l++) { this.gW[l].fill(0); this.gb[l].fill(0); } }
+
+    // weight <- weight - lr * gradient   (optionally clipped by global norm)
+    sgdStep(lr, clip = 0) {
+      const norm = this.gradNorm();
+      const sc = clip > 0 && norm > clip ? clip / norm : 1;
+      for (let l = 0; l < this.L; l++) {
+        const W = this.W[l], gW = this.gW[l], b = this.b[l], gb = this.gb[l];
+        for (let i = 0; i < W.length; i++) W[i] -= lr * sc * gW[i];
+        for (let i = 0; i < b.length; i++) b[i] -= lr * sc * gb[i];
+      }
+      this.zeroGrad();
+      return norm;
+    }
+
+    // Adam: per-weight step sizes from running averages of the gradient.
+    adamStep(lr, clip = 10, b1 = 0.9, b2 = 0.999, eps = 1e-8) {
+      const norm = this.gradNorm();
+      const sc = clip > 0 && norm > clip ? clip / norm : 1;
+      if (!this.m) {
+        this.m = []; this.v = [];
+        for (let l = 0; l < this.L; l++) {
+          this.m.push([new Float32Array(this.W[l].length), new Float32Array(this.b[l].length)]);
+          this.v.push([new Float32Array(this.W[l].length), new Float32Array(this.b[l].length)]);
+        }
+      }
+      this.t++;
+      const bc1 = 1 - Math.pow(b1, this.t), bc2 = 1 - Math.pow(b2, this.t);
+      for (let l = 0; l < this.L; l++) {
+        const P = [this.W[l], this.b[l]], G = [this.gW[l], this.gb[l]];
+        for (let k = 0; k < 2; k++) {
+          const p = P[k], g = G[k], m = this.m[l][k], v = this.v[l][k];
+          for (let i = 0; i < p.length; i++) {
+            const gi = g[i] * sc;
+            m[i] = b1 * m[i] + (1 - b1) * gi;
+            v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+            p[i] -= (lr * (m[i] / bc1)) / (Math.sqrt(v[i] / bc2) + eps);
+          }
+        }
+      }
+      this.zeroGrad();
+      return norm;
+    }
+
+    clone() {
+      const c = Object.create(MLP.prototype);
+      c.sizes = this.sizes.slice(); c.L = this.L;
+      c.W = this.W.map((w) => Float32Array.from(w));
+      c.b = this.b.map((b) => Float32Array.from(b));
+      c._alloc();
+      return c;
+    }
+    copyFrom(o) {
+      for (let l = 0; l < this.L; l++) { this.W[l].set(o.W[l]); this.b[l].set(o.b[l]); }
+    }
+    flat() {
+      const out = new Float32Array(this.paramCount); let k = 0;
+      for (let l = 0; l < this.L; l++) { out.set(this.W[l], k); k += this.W[l].length; out.set(this.b[l], k); k += this.b[l].length; }
+      return out;
+    }
+    loadFlat(f) {
+      if (f.length !== this.paramCount) throw new Error(`weight count ${f.length} != ${this.paramCount}`);
+      let k = 0;
+      for (let l = 0; l < this.L; l++) {
+        this.W[l].set(f.subarray(k, k + this.W[l].length)); k += this.W[l].length;
+        this.b[l].set(f.subarray(k, k + this.b[l].length)); k += this.b[l].length;
+      }
+    }
+    toBase64() { return bytesToB64(new Uint8Array(this.flat().buffer)); }
+    loadBase64(s) { const bytes = b64ToBytes(s); this.loadFlat(new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4)); }
+  }
+
+  function bytesToB64(bytes) {
+    if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+    let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function b64ToBytes(s) {
+    if (typeof Buffer !== 'undefined') { const b = Buffer.from(s, 'base64'); const out = new Uint8Array(b.length); out.set(b); return out; }
+    const bin = atob(s); const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  // ------------------------------------------------------ mini Pac-Man env
+  const MINI_MAZE = [
+    '#########',
+    '#...G...#',
+    '#.#.#.#.#',
+    '#.......#',
+    '#.#.#.#.#',
+    '#...P...#',
+    '#########',
+  ];
+  const DEFAULT_REWARDS = { pellet: 10, step: -1, death: -300, clear: 200 };
+
+  class MiniPac {
+    constructor(opts = {}) {
+      const rows = opts.maze || MINI_MAZE;
+      this.H = rows.length; this.W = rows[0].length;
+      this.wall = new Uint8Array(this.W * this.H);
+      this.cells = []; // grid index of each walkable cell
+      this.cellOf = new Int32Array(this.W * this.H).fill(-1);
+      const pel = [];
+      for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
+        const ch = rows[y][x], g = y * this.W + x;
+        if (ch === '#') { this.wall[g] = 1; continue; }
+        this.cellOf[g] = this.cells.length; this.cells.push(g);
+        pel.push(ch === '.' ? 1 : 0);
+        if (ch === 'P') this.playerStart = this.cells.length - 1;
+        if (ch === 'G') this.ghostStart = this.cells.length - 1;
+      }
+      this.N = this.cells.length;
+      this.pelletStart = Uint8Array.from(pel);
+      this.nbr = [];
+      for (let c = 0; c < this.N; c++) {
+        const g = this.cells[c], y = Math.floor(g / this.W), x = g % this.W;
+        this.nbr.push(ACTIONS.map(([dy, dx]) => this.cellOf[(y + dy) * this.W + (x + dx)]));
+      }
+      this.dist = [];
+      for (let s = 0; s < this.N; s++) {
+        const d = new Int32Array(this.N).fill(1e6); d[s] = 0; const q = [s];
+        for (let h = 0; h < q.length; h++) { const c = q[h]; for (const n of this.nbr[c]) if (n >= 0 && d[n] > d[c] + 1) { d[n] = d[c] + 1; q.push(n); } }
+        this.dist.push(d);
+      }
+      this.rewards = Object.assign({}, DEFAULT_REWARDS, opts.rewards || {});
+      this.maxSteps = opts.maxSteps ?? 150;
+      this.aggression = opts.aggression ?? 0.75;
+      this.obsSize = 4 * this.N;
+      this.rng = makeRng(opts.seed ?? 1);
+      this.reset();
+    }
+    xy(c) { const g = this.cells[c]; return [g % this.W, Math.floor(g / this.W)]; }
+    reset(seed) {
+      if (seed != null) this.rng = makeRng(seed);
+      this.pellets = Uint8Array.from(this.pelletStart);
+      this.player = this.playerStart; this.ghost = this.ghostStart; this.ghostPrev = this.ghostStart;
+      this.ghostDir = -1; this.steps = 0; this.score = 0;
+      this.done = false; this.won = false; this.dead = false; this.truncated = false;
+      this.lastAction = 3;
+      return this.obs();
+    }
+    get pelletsLeft() { let n = 0; for (const p of this.pellets) n += p; return n; }
+    getState() {
+      return { pellets: Uint8Array.from(this.pellets), player: this.player, ghost: this.ghost, ghostPrev: this.ghostPrev,
+        ghostDir: this.ghostDir, steps: this.steps, score: this.score, done: this.done, won: this.won, dead: this.dead, lastAction: this.lastAction };
+    }
+    setState(s) {
+      this.pellets = Uint8Array.from(s.pellets); this.player = s.player; this.ghost = s.ghost;
+      this.ghostPrev = s.ghostPrev ?? s.ghost; this.ghostDir = s.ghostDir ?? -1; this.steps = s.steps ?? 0;
+      this.score = s.score ?? 0; this.done = !!s.done; this.won = !!s.won; this.dead = !!s.dead; this.truncated = false;
+      this.lastAction = s.lastAction ?? 3;
+    }
+    // Observation: 4 blocks of N (one entry per walkable square): pellet, Pac-Man, ghost, ghost's previous square.
+    encode(s = this) {
+      const N = this.N, o = new Float32Array(4 * N);
+      for (let c = 0; c < N; c++) o[c] = s.pellets[c];
+      o[N + s.player] = 1; o[2 * N + s.ghost] = 1; o[3 * N + (s.ghostPrev ?? s.ghost)] = 1;
+      return o;
+    }
+    obs() { return this.encode(this); }
+
+    _ghostMove(deterministic) {
+      let legal = [];
+      for (let a = 0; a < 4; a++) if (this.nbr[this.ghost][a] >= 0) legal.push(a);
+      if (this.ghostDir >= 0 && legal.length > 1) {
+        const nr = legal.filter((a) => a !== OPPOSITE[this.ghostDir]);
+        if (nr.length) legal = nr;
+      }
+      let a;
+      if (deterministic || this.rng() < this.aggression) {
+        const d = this.dist[this.player];
+        let best = Infinity, choices = [];
+        for (const m of legal) { const v = d[this.nbr[this.ghost][m]]; if (v < best) { best = v; choices = [m]; } else if (v === best) choices.push(m); }
+        a = deterministic ? choices[0] : this.rng.pick(choices);
+      } else a = this.rng.pick(legal);
+      this.ghostPrev = this.ghost; this.ghost = this.nbr[this.ghost][a]; this.ghostDir = a;
+    }
+
+    step(a, opts = {}) {
+      if (this.done) throw new Error('episode is over; call reset()');
+      const R = this.rewards, parts = [];
+      let r = R.step; parts.push(['step', R.step]);
+      this.steps++; this.lastAction = a;
+      const n = this.nbr[this.player][a];
+      const bumped = n < 0;
+      if (!bumped) this.player = n;
+      if (this.pellets[this.player]) { this.pellets[this.player] = 0; r += R.pellet; parts.push(['pellet', R.pellet]); }
+      let caught = this.player === this.ghost;
+      if (!caught) { this._ghostMove(!!opts.deterministicGhost); caught = this.player === this.ghost; }
+      else this.ghostPrev = this.ghost;
+      if (caught) { r += R.death; parts.push(['caught', R.death]); this.dead = true; this.done = true; }
+      else if (this.pelletsLeft === 0) { r += R.clear; parts.push(['cleared', R.clear]); this.won = true; this.done = true; }
+      else if (this.steps >= this.maxSteps) { this.truncated = true; this.done = true; }
+      this.score += r;
+      return { obs: this.obs(), reward: r, terminal: this.dead || this.won, truncated: this.truncated, parts, bumped, caught };
+    }
+    legal(c = this.player) { const out = []; for (let a = 0; a < 4; a++) if (this.nbr[c][a] >= 0) out.push(a); return out; }
+  }
+
+  // ------------------------------------------------------------ gridworld
+  // cell types: 0 empty, 1 wall, 2 cherry (+), 3 ghost (-)
+  const EMPTY = 0, WALL = 1, CHERRY = 2, GHOST = 3;
+  class GridWorld {
+    constructor(W = 7, H = 6, opts = {}) {
+      this.W = W; this.H = H;
+      this.type = new Uint8Array(W * H);
+      this.rewards = Object.assign({ cherry: 10, ghost: -10, step: 0 }, opts.rewards || {});
+      this.maxSteps = opts.maxSteps ?? 40;
+      this.rng = makeRng(opts.seed ?? 3);
+      if (opts.layout) this.load(opts.layout); else this.load(GridWorld.defaultLayout(W, H));
+    }
+    static defaultLayout(W, H) {
+      const t = new Uint8Array(W * H);
+      const set = (x, y, v) => { if (x < W && y < H) t[y * W + x] = v; };
+      set(W - 1, 0, CHERRY); set(W - 2, 2, GHOST);
+      set(2, 1, WALL); set(2, 2, WALL); set(2, 3, WALL); set(4, 3, WALL); set(4, 4, WALL);
+      return t;
+    }
+    load(t) { this.type.set(t); }
+    isState(s) { return this.type[s] === EMPTY; }
+    // Environment dynamics: bump into walls/edges = stay put; entering cherry/ghost ends the episode.
+    transition(s, a) {
+      const x = s % this.W, y = Math.floor(s / this.W);
+      const nx = x + ACTIONS[a][1], ny = y + ACTIONS[a][0];
+      let n = s;
+      if (nx >= 0 && nx < this.W && ny >= 0 && ny < this.H && this.type[ny * this.W + nx] !== WALL) n = ny * this.W + nx;
+      const t = this.type[n];
+      if (t === CHERRY) return { next: n, reward: this.rewards.cherry + this.rewards.step, terminal: true };
+      if (t === GHOST) return { next: n, reward: this.rewards.ghost + this.rewards.step, terminal: true };
+      return { next: n, reward: this.rewards.step, terminal: false };
+    }
+    states() { const out = []; for (let s = 0; s < this.type.length; s++) if (this.isState(s)) out.push(s); return out; }
+    randomStart() { const st = this.states(); return st.length ? this.rng.pick(st) : -1; }
+    encode(s) { const o = new Float32Array(this.W + this.H); o[s % this.W] = 1; o[this.W + Math.floor(s / this.W)] = 1; return o; }
+    // BFS distance (in moves) from every square to the nearest cherry, ignoring ghosts as passable? no: ghosts are terminal.
+    distanceToCherry() {
+      const d = new Int32Array(this.type.length).fill(-1), q = [];
+      for (let s = 0; s < d.length; s++) if (this.type[s] === CHERRY) { d[s] = 0; q.push(s); }
+      for (let h = 0; h < q.length; h++) {
+        const s = q[h], x = s % this.W, y = Math.floor(s / this.W);
+        for (const [dy, dx] of ACTIONS) {
+          const nx = x + dx, ny = y + dy; if (nx < 0 || nx >= this.W || ny < 0 || ny >= this.H) continue;
+          const n = ny * this.W + nx; if (d[n] >= 0 || this.type[n] !== EMPTY) continue;
+          d[n] = d[s] + 1; q.push(n);
+        }
+      }
+      return d;
+    }
+  }
+
+  // Q "brains" for the gridworld: a table (one number per square per move) or a small network.
+  class TableQ {
+    constructor(nStates) { this.q = new Float32Array(nStates * 4); this.kind = 'table'; }
+    values(s) { return this.q.subarray(4 * s, 4 * s + 4); }
+    snapshot() { const t = new TableQ(this.q.length / 4); t.q.set(this.q); return t; }
+    update(s, a, target, alpha) { const i = 4 * s + a; const old = this.q[i]; this.q[i] = old + alpha * (target - old); return old; }
+  }
+  class NetQ {
+    constructor(world, hidden = 32, seed = 5) { this.world = world; this.net = new MLP([world.W + world.H, hidden, 4], seed, 0.05); this.kind = 'net'; }
+    values(s) { return this.net.forward(this.world.encode(s)); }
+    snapshot() { const n = Object.create(NetQ.prototype); n.world = this.world; n.kind = 'net'; n.net = this.net.clone(); return n; }
+    // batch of {s, a, target}; one Adam step on mean Huber loss. Returns mean loss.
+    train(batch, lr) {
+      let loss = 0; const d = new Float32Array(4);
+      for (const { s, a, target } of batch) {
+        const q = this.net.forward(this.world.encode(s));
+        const gap = q[a] - target; loss += huber(gap);
+        d.fill(0); d[a] = huberGrad(gap) / batch.length; this.net.backward(d);
+      }
+      this.net.adamStep(lr, 10);
+      return loss / batch.length;
+    }
+  }
+
+  // -------------------------------------------------------------------- DQN
+  const DQN_DEFAULTS = {
+    hidden: [64, 64], lr: 1e-3, gamma: 0.97, batch: 32, bufferSize: 20000, learningStarts: 1000,
+    trainEvery: 1, targetSync: 500, epsStart: 1, epsEnd: 0.05, epsDecay: 15000, rewardScale: 0.01,
+    clip: 10, double: true, useTarget: true, useReplay: true, seed: 1,
+  };
+
+  class DQN {
+    constructor(obsSize, nActions, cfg = {}) {
+      this.cfg = Object.assign({}, DQN_DEFAULTS, cfg);
+      this.obsSize = obsSize; this.nActions = nActions;
+      this.rng = makeRng(this.cfg.seed * 7919 + 13);
+      this.live = new MLP([obsSize, ...this.cfg.hidden, nActions], this.cfg.seed);
+      this.frozen = this.live.clone();
+      this._allocBuffer(this.cfg.bufferSize);
+      this.steps = 0; this.updates = 0; this.syncs = 0; this.lastLoss = NaN;
+    }
+    _allocBuffer(n) {
+      this.cap = n; this.bObs = new Uint8Array(n * this.obsSize); this.bNext = new Uint8Array(n * this.obsSize);
+      this.bA = new Uint8Array(n); this.bR = new Float32Array(n); this.bT = new Uint8Array(n);
+      this.pos = 0; this.size = 0;
+    }
+    resizeBuffer(n) { this._allocBuffer(n); this.cfg.bufferSize = n; }
+    epsilon(step = this.steps) {
+      const f = Math.min(1, step / Math.max(1, this.cfg.epsDecay));
+      return this.cfg.epsStart + f * (this.cfg.epsEnd - this.cfg.epsStart);
+    }
+    q(obs) { return this.live.forward(obs); }
+    act(obs, eps = this.epsilon()) { return this.rng() < eps ? this.rng.int(this.nActions) : argmax(this.q(obs)); }
+
+    // The heart of it: target = r + gamma * v, v taken from the next state (0 if the game ended).
+    target(r, nextObs, terminal) {
+      if (terminal) return { target: r, v: 0, aStar: -1, qLiveNext: null, qValNext: null };
+      const qLiveNext = this.live.forward(nextObs);
+      const valueNet = this.cfg.useTarget ? this.frozen : this.live;
+      const qValNext = this.cfg.useTarget ? valueNet.forward(nextObs) : qLiveNext;
+      const aStar = this.cfg.double ? argmax(qLiveNext) : argmax(qValNext);
+      const v = qValNext[aStar];
+      return { target: r + this.cfg.gamma * v, v, aStar, qLiveNext, qValNext };
+    }
+
+    // One gradient step on a list of transitions {obs, a, r, next, terminal} (r already scaled).
+    trainOn(batch, optimizer = 'adam', lr = this.cfg.lr) {
+      let loss = 0; const d = new Float32Array(this.nActions);
+      for (const tr of batch) {
+        const { target } = this.target(tr.r, tr.next, tr.terminal);
+        const q = this.live.forward(tr.obs); // forward last so backward sees these activations
+        const gap = q[tr.a] - target; loss += huber(gap);
+        d.fill(0); d[tr.a] = huberGrad(gap) / batch.length; this.live.backward(d);
+      }
+      if (optimizer === 'sgd') this.live.sgdStep(lr, this.cfg.clip); else this.live.adamStep(lr, this.cfg.clip);
+      this.updates++;
+      this.lastLoss = loss / batch.length;
+      return this.lastLoss;
+    }
+
+    _get(i) {
+      const o = this.obsSize;
+      return { obs: this.bObs.subarray(i * o, i * o + o), a: this.bA[i], r: this.bR[i], next: this.bNext.subarray(i * o, i * o + o), terminal: this.bT[i] === 1 };
+    }
+    store(obs, a, rScaled, next, terminal) {
+      const i = this.pos, o = this.obsSize;
+      for (let k = 0; k < o; k++) { this.bObs[i * o + k] = obs[k] > 0.5 ? 1 : 0; this.bNext[i * o + k] = next[k] > 0.5 ? 1 : 0; }
+      this.bA[i] = a; this.bR[i] = rScaled; this.bT[i] = terminal ? 1 : 0;
+      this.pos = (this.pos + 1) % this.cap; this.size = Math.min(this.size + 1, this.cap);
+    }
+    sample(n) { const out = []; for (let k = 0; k < n; k++) out.push(this._get(this.rng.int(this.size))); return out; }
+
+    // Called once per environment step. Returns the loss if a gradient step happened.
+    observe(obs, a, reward, next, terminal) {
+      const r = reward * this.cfg.rewardScale;
+      this.steps++;
+      let loss = null;
+      if (this.cfg.useReplay) {
+        this.store(obs, a, r, next, terminal);
+        if (this.size >= Math.min(this.cfg.learningStarts, this.cap) && this.steps % this.cfg.trainEvery === 0) loss = this.trainOn(this.sample(this.cfg.batch));
+      } else if (this.steps >= this.cfg.learningStarts && this.steps % this.cfg.trainEvery === 0) {
+        loss = this.trainOn([{ obs: Float32Array.from(obs), a, r, next: Float32Array.from(next), terminal }]);
+      }
+      if (this.cfg.useTarget && this.steps % this.cfg.targetSync === 0) this.sync();
+      return loss;
+    }
+    sync() { this.frozen.copyFrom(this.live); this.syncs++; }
+  }
+
+  return { makeRng, argmax, huber, huberGrad, ACTIONS, ACTION_NAMES, OPPOSITE, MLP, MiniPac, MINI_MAZE, DEFAULT_REWARDS,
+    GridWorld, TableQ, NetQ, EMPTY, WALL, CHERRY, GHOST, DQN, DQN_DEFAULTS, bytesToB64, b64ToBytes };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+</script>
+<script>(() => {
+  'use strict';
+  const E = Engine;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const MINUS = '\u2212';
+  const sgn = (x, d = 2) => (x < 0 ? MINUS : '+') + Math.abs(x).toFixed(d);
+  const num = (x, d = 2) => (x < -0.5 * Math.pow(10, -d) ? MINUS : '') + Math.abs(x).toFixed(d);
+  const pts = (x) => (x < 0 ? MINUS : '+') + Math.abs(Math.round(x));
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const MOVE = ['up', 'down', 'left', 'right'];
+  const GLYPH = ['↑', '↓', '←', '→'];
+  const PAC_ROT = [270, 90, 180, 0];
+  const ARR_ROT = [0, 180, 270, 90];
+  const TRAINED_B64 = "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";
+  const TRAINED_META = {"step":135000,"heldOutGames":500,"win":0.978,"score":407.9,"len":50.5};
+  const HIDDEN = [64, 64];
+  const SCALE = 0.01;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function el(tag, cls, parent, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function html(node, s) { node.innerHTML = s; return node; }
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function heat(t) {
+    const a = Math.round(clamp(Math.abs(t), 0, 1) * 80);
+    if (a < 2) return '';
+    return `color-mix(in srgb, var(${t >= 0 ? '--heat-pos' : '--heat-neg'}) ${a}%, transparent)`;
+  }
+  function tieArgmax(q, rng) {
+    let best = -Infinity, ties = [];
+    for (let i = 0; i < q.length; i++) { if (q[i] > best + 1e-9) { best = q[i]; ties = [i]; } else if (Math.abs(q[i] - best) <= 1e-9) ties.push(i); }
+    return ties.length === 1 ? ties[0] : ties[rng.int(ties.length)];
+  }
+  function newTrainedBrain() { const m = new E.MLP([116, ...HIDDEN, 4], 1); m.loadBase64(TRAINED_B64); return m; }
+
+  // ---------------------------------------------------------- controls
+  function bindSeg(root, onChange) {
+    root.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (!b || b.disabled || !root.contains(b)) return;
+      setSeg(root, b.dataset.v); onChange(b.dataset.v);
+    });
+  }
+  function setSeg(root, v) { $$('button[data-v]', root).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(v)))); }
+
+  function makeKnob(parent, spec) {
+    const wrap = el('label', 'knob', parent);
+    el('span', 'k-name', wrap, spec.label);
+    const out = el('output', '', wrap);
+    const input = el('input', '', wrap);
+    input.type = 'range'; input.min = 0; input.max = 1000; input.step = 1;
+    if (spec.hint) el('span', 'k-hint', wrap, spec.hint);
+    const R = 1000;
+    const toPos = (v) => spec.log ? Math.round(R * Math.log(v / spec.min) / Math.log(spec.max / spec.min)) : Math.round(R * (v - spec.min) / (spec.max - spec.min));
+    const fromPos = (p) => {
+      let v = spec.log ? spec.min * Math.pow(spec.max / spec.min, p / R) : spec.min + (spec.max - spec.min) * (p / R);
+      if (spec.step) v = Math.round(v / spec.step) * spec.step;
+      if (spec.sig) v = +v.toPrecision(spec.sig);
+      return clamp(v, spec.min, spec.max);
+    };
+    let value = spec.value;
+    const show = () => { out.textContent = spec.fmt ? spec.fmt(value) : value.toFixed(spec.digits ?? 2); };
+    input.value = toPos(value); show();
+    input.addEventListener('input', () => { value = fromPos(+input.value); show(); spec.onInput && spec.onInput(value); });
+    input.addEventListener('change', () => { spec.onChange && spec.onChange(value); });
+    return {
+      get: () => value,
+      set(v, silent) { value = v; input.value = toPos(v); show(); if (!silent) { spec.onInput && spec.onInput(v); } },
+      wrap, input,
+    };
+  }
+
+  function fitCanvas(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 300, h = cv.clientHeight || 150;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function haloText(ctx, text, x, y) {
+    ctx.save(); ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = cssVar('--sheet-2'); ctx.setLineDash([]);
+    ctx.strokeText(text, x, y); ctx.restore(); ctx.fillText(text, x, y);
+  }
+  function niceTicks(lo, hi, n = 4) {
+    const span = hi - lo || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= step0) || mag * 10;
+    const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6));
+    return out;
+  }
+
+  // ------------------------------------------------------------ Q bars
+  class QBars {
+    constructor(root) {
+      this.root = root; root.textContent = ''; this.cols = [];
+      for (let a = 0; a < 4; a++) {
+        const qb = el('div', 'qb', root), tr = el('div', 'qb-track', qb);
+        const zero = el('div', 'qb-zero', tr), bar = el('div', 'qb-bar', tr), val = el('div', 'qb-val num', tr);
+        const name = el('div', 'qb-name', qb);
+        this.cols.push({ zero, bar, val, name });
+      }
+    }
+    render(q, { hi = -1, star = -1, cls = 'guess', range = null } = {}) {
+      let lo = Math.min(0, ...q), top = Math.max(0, ...q);
+      if (range) { lo = Math.min(lo, range[0]); top = Math.max(top, range[1]); }
+      const span = (top - lo) || 1, pad = span * 0.26;
+      const T = top + pad, B = lo < 0 ? lo - pad : 0;
+      const y = (v) => ((T - v) / (T - B)) * 100;
+      for (let a = 0; a < 4; a++) {
+        const c = this.cols[a], v = q[a];
+        const y1 = y(Math.max(v, 0)), y2 = y(Math.min(v, 0));
+        c.bar.style.top = y1 + '%'; c.bar.style.height = `max(2px, ${y2 - y1}%)`;
+        c.bar.className = 'qb-bar' + (a === hi ? ' ' + cls : '');
+        c.zero.style.top = y(0) + '%';
+        c.val.textContent = num(v);
+        c.val.style.top = v >= 0 ? `calc(${y1}% - 17px)` : `calc(${y2}% + 2px)`;
+        c.name.className = 'qb-name' + (a === hi ? ' hi' : '');
+        c.name.innerHTML = `<span class="g">${GLYPH[a]}</span><span class="w"> ${MOVE[a]}</span>${a === star ? ' <span class="star">★</span>' : ''}`;
+      }
+    }
+  }
+
+  // --------------------------------------------------------- maze view
+  class MazeView {
+    constructor(root, env, opts = {}) {
+      this.root = root; this.env = env; this.opts = opts;
+      root.style.setProperty('--cols', env.W); root.style.setProperty('--rows', env.H);
+      root.textContent = '';
+      this.floor = new Array(env.N);
+      for (let g = 0; g < env.W * env.H; g++) {
+        const c = env.cellOf[g];
+        if (c < 0) {
+          const d = el('div', 'cell wall', root);
+          const x = g % env.W, yy = Math.floor(g / env.W);
+          if (x === 0 || yy === 0 || x === env.W - 1 || yy === env.H - 1) d.classList.add('edge');
+          continue;
+        }
+        const d = el(opts.onTap ? 'button' : 'div', 'cell floor', root);
+        if (opts.onTap) {
+          d.type = 'button';
+          const [x, yy] = env.xy(c);
+          d.setAttribute('aria-label', `Square in column ${x}, row ${yy}`);
+          d.addEventListener('click', () => opts.onTap(c));
+        }
+        const tint = el('div', 'tint', d), pel = el('div', 'pellet', d);
+        const val = opts.mini ? null : el('div', 'cval', d);
+        const arr = opts.mini ? null : el('div', 'carr', d);
+        if (arr) arr.hidden = true;
+        this.floor[c] = { d, tint, pel, val, arr };
+      }
+      this.ring = el('div', 'pick-ring'); this.ring.hidden = true;
+      this.trail = el('div', 'actor ghost trail', root);
+      this.ghost = el('div', 'actor ghost', root);
+      this.pac = el('div', 'actor pac', root);
+    }
+    place(actor, c) { const [x, y] = this.env.xy(c); actor.style.transform = `translate(${x * 100}%, ${y * 100}%)`; }
+    instant(on) { this.root.classList.toggle('instant', !!on); }
+    setRing(c) { if (c == null || c < 0) { this.ring.hidden = true; return; } this.ring.hidden = false; this.floor[c].d.appendChild(this.ring); }
+    render(s, overlay = null) {
+      const N = this.env.N;
+      for (let c = 0; c < N; c++) {
+        const f = this.floor[c];
+        f.pel.hidden = !s.pellets[c] || c === s.player;
+        f.pel.style.opacity = overlay ? '.35' : '';
+        if (!overlay || overlay.norm[c] == null) {
+          f.tint.style.background = '';
+          if (f.val) f.val.textContent = '';
+          if (f.arr) f.arr.hidden = true;
+          continue;
+        }
+        f.tint.style.background = heat(overlay.norm[c]);
+        if (f.val) f.val.textContent = overlay.labels ? overlay.labels[c] : '';
+        if (f.arr) {
+          const a = overlay.arrows ? overlay.arrows[c] : -1;
+          f.arr.hidden = !(a >= 0);
+          if (a >= 0) f.arr.style.setProperty('--rot', ARR_ROT[a] + 'deg');
+        }
+      }
+      this.place(this.pac, s.player);
+      this.pac.style.setProperty('--rot', PAC_ROT[s.lastAction ?? 3] + 'deg');
+      this.pac.classList.toggle('dead', !!s.dead);
+      this.place(this.ghost, s.ghost);
+      const gp = s.ghostPrev ?? s.ghost;
+      this.trail.hidden = gp === s.ghost;
+      if (gp !== s.ghost) this.place(this.trail, gp);
+    }
+  }
+
+  // =================================================================== ARCADE
+  const arcade = (() => {
+    const DEF = { lr: 0.001, gamma: 0.97, epsDecay: 15000, targetSync: 500, batch: 32, bufferSize: 20000, useReplay: true, useTarget: true, double: true, epsStart: 1, epsEnd: 0.05 };
+    const cfg = Object.assign({}, DEF);
+    const env = new E.MiniPac({ seed: 11 });
+    const testEnv = new E.MiniPac({ seed: 999 });
+    let agent, obs, testObs;
+    const EXAM_EVERY = 2500, EXAM_GAMES = 10;
+    const examEnv = new E.MiniPac({ seed: 31337 });
+    const st = { running: false, mode: 'watch', testing: false, scores: [], scoreSteps: [], wins: [], events: [], exams: [], nextExam: 0, lastStep: 0, lastBoard: 0, lastCurve: 0, lastStats: 0, baseline: 0, testLast: null, testGames: 0, loadedTrained: false };
+    let view, qbars, knobs = {};
+    const panel = () => $('#panel-arcade');
+
+    function randomBaseline() {
+      const e = new E.MiniPac({ seed: 4242 }), rng = E.makeRng(77); let s = 0; const n = 300;
+      for (let i = 0; i < n; i++) { e.reset(); while (!e.done) e.step(rng.int(4)); s += e.score; }
+      return s / n;
+    }
+    function newAgent(extra = {}) {
+      agent = new E.DQN(116, 4, Object.assign({ hidden: HIDDEN, seed: (Math.random() * 1e9) | 0 }, cfg, extra));
+      obs = env.reset((Math.random() * 1e9) | 0);
+      st.scores = []; st.scoreSteps = []; st.wins = []; st.events = []; st.exams = []; st.loadedTrained = false;
+      runExam();
+    }
+    // Exam: 10 fixed games of best play (no random moves, no learning). This is what the agent has really learned.
+    function runExam(brk = false) {
+      let sc = 0, wins = 0;
+      for (let i = 0; i < EXAM_GAMES; i++) {
+        let o = examEnv.reset(1000 + i);
+        while (!examEnv.done) o = examEnv.step(E.argmax(agent.live.forward(o))).obs;
+        sc += examEnv.score; wins += examEnv.won ? 1 : 0;
+      }
+      st.exams.push({ step: agent.steps, score: sc / EXAM_GAMES, wins, brk });
+      st.nextExam = agent.steps - (agent.steps % EXAM_EVERY) + EXAM_EVERY;
+    }
+    function addEvent(label) { st.events.push({ step: agent.steps, label }); drawCurve(); }
+
+    function trainStep() {
+      const a = agent.act(obs);
+      const r = env.step(a);
+      agent.observe(obs, a, r.reward, r.obs, r.terminal);
+      obs = r.obs;
+      if (env.done) { st.scores.push(env.score); st.scoreSteps.push(agent.steps); st.wins.push(env.won ? 1 : 0); obs = env.reset(); }
+      if (agent.steps >= st.nextExam) runExam();
+    }
+    function testStep() {
+      if (!testObs || testEnv.done) { testObs = testEnv.reset(); st.testGames++; }
+      const r = testEnv.step(agent.act(testObs, 0));
+      testObs = r.obs;
+      if (testEnv.done) st.testLast = { score: testEnv.score, won: testEnv.won, dead: testEnv.dead };
+    }
+
+    function renderBoard(e, o, instant) {
+      view.instant(instant || reduceMotion);
+      view.render(e);
+      $('#arcade-q').classList.toggle('instant', !!instant || (st.running && st.mode !== 'watch'));
+      const q = agent.q(o);
+      qbars.render(q, { hi: E.argmax(q), cls: 'live' });
+      const status = $('#arcade-status');
+      if (st.testing) {
+        const last = st.testLast ? ` Last test game: ${pts(st.testLast.score)}${st.testLast.won ? ', cleared the board' : st.testLast.dead ? ', caught' : ''}.` : '';
+        status.innerHTML = `<span>Test drive, no learning, no random moves.${last}</span><span class="num">score ${pts(e.score)}</span>`;
+      } else {
+        status.innerHTML = `<span>Game ${st.scores.length + 1}, move ${e.steps}</span><span class="num">score ${pts(e.score)}</span>`;
+      }
+    }
+    function avgLast(arr, n) { if (!arr.length) return NaN; const s = arr.slice(-n); return s.reduce((a, b) => a + b, 0) / s.length; }
+    function renderStats() {
+      const dl = $('#arc-stats');
+      const avg = avgLast(st.scores, 20), ex = st.exams[st.exams.length - 1];
+      const rows = [
+        ['Games played', st.scores.length.toLocaleString()],
+        ['Steps', agent.steps.toLocaleString()],
+        ['Random-move chance (ε)', agent.epsilon().toFixed(2)],
+        ['Replay memory', agent.cfg.useReplay ? `${agent.size.toLocaleString()} / ${agent.cap.toLocaleString()}` : 'off'],
+        ['Weight updates', agent.updates.toLocaleString()],
+        ['Frozen-copy syncs', agent.cfg.useTarget ? agent.syncs.toLocaleString() : 'off'],
+        ['Practice avg, last 20', isNaN(avg) ? '—' : pts(avg)],
+        ['Last loss', isNaN(agent.lastLoss) ? '—' : agent.lastLoss.toFixed(4)],
+        ['Latest exam score', ex ? pts(ex.score) : '—'],
+        ['Exam boards cleared', ex ? `${ex.wins} of ${EXAM_GAMES}` : '—'],
+      ];
+      if (!dl._built) { dl.textContent = ''; dl._dd = rows.map(([k]) => { const d = el('div', '', dl); el('dt', '', d, k); return el('dd', '', d); }); dl._built = true; }
+      rows.forEach(([, v], i) => { if (dl._dd[i].textContent !== v) dl._dd[i].textContent = v; });
+    }
+    function drawCurve() {
+      const cv = $('#arc-chart');
+      if (!cv || panel().hidden) return;
+      const { ctx, w, h } = fitCanvas(cv);
+      const ink = cssVar('--ink'), ink2 = cssVar('--ink-3'), live = cssVar('--live'), frozen = cssVar('--frozen');
+      const L = 42, Rm = 12, T = 12, B = 26;
+      const sc = st.scores, ss = st.scoreSteps, ex = st.exams;
+      ctx.font = '11px ' + cssVar('--font');
+      if (!sc.length && ex.length < 2) {
+        ctx.fillStyle = ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('Press Start training. Practice games show up as dots,', w / 2, h / 2 - 8);
+        ctx.fillText('exam scores as a line.', w / 2, h / 2 + 8);
+        return;
+      }
+      const x0 = ex.length ? ex[0].step : (ss[0] || 0), x1 = Math.max(agent.steps, x0 + 1000);
+      let lo = st.baseline, hi = 0;
+      for (const v of sc) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      for (const e of ex) { if (e.score < lo) lo = e.score; if (e.score > hi) hi = e.score; }
+      const pad = (hi - lo) * 0.08 || 10; lo -= pad; hi += pad;
+      const X = (step) => L + ((step - x0) / (x1 - x0)) * (w - L - Rm);
+      const Y = (v) => T + ((hi - v) / (hi - lo)) * (h - T - B);
+      ctx.lineWidth = 1; ctx.fillStyle = ink2; ctx.strokeStyle = ink2; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      for (const t of niceTicks(lo, hi, 4)) { ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.moveTo(L, Y(t)); ctx.lineTo(w - Rm, Y(t)); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillText(String(t).replace('-', MINUS), L - 6, Y(t)); }
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      for (const t of niceTicks(x0, x1, 4)) { if (t < x0) continue; ctx.fillText(t >= 1000 ? `${+(t / 1000).toFixed(1)}k` : String(t), X(t), h - B + 6); }
+      ctx.textAlign = 'right'; ctx.fillText('steps', w - Rm, h - B + 6 + 0);
+      // random baseline
+      ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(L, Y(st.baseline)); ctx.lineTo(w - Rm, Y(st.baseline)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; haloText(ctx, 'random play', L + 4, Y(st.baseline) - 3);
+      // events
+      ctx.textBaseline = 'top';
+      st.events.forEach((ev, k) => {
+        const x = X(clamp(ev.step, x0, x1));
+        ctx.strokeStyle = frozen; ctx.globalAlpha = 0.8; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, h - B); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+        const right = x > w * 0.62; ctx.fillStyle = frozen; ctx.textAlign = right ? 'right' : 'left';
+        haloText(ctx, ev.label, x + (right ? -4 : 4), T + (k % 3) * 13);
+      });
+      // practice games (with random moves)
+      ctx.fillStyle = ink; ctx.globalAlpha = sc.length > 400 ? 0.16 : 0.28;
+      const stride = Math.max(1, Math.floor(sc.length / (w * 1.5)));
+      for (let i = 0; i < sc.length; i += stride) { ctx.beginPath(); ctx.arc(X(ss[i]), Y(sc[i]), 1.6, 0, 6.3); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      // exam line (best play)
+      if (ex.length) {
+        ctx.strokeStyle = live; ctx.fillStyle = live; ctx.lineWidth = 2.5; ctx.beginPath();
+        ex.forEach((e, i) => (i && !e.brk ? ctx.lineTo(X(e.step), Y(e.score)) : ctx.moveTo(X(e.step), Y(e.score))));
+        ctx.stroke();
+        if (ex.length < 60) for (const e of ex) { ctx.beginPath(); ctx.arc(X(e.step), Y(e.score), 2.6, 0, 6.3); ctx.fill(); }
+        const last = ex[ex.length - 1];
+        ctx.font = '600 11px ' + cssVar('--font'); ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+        haloText(ctx, 'exam', Math.min(X(last.step), w - Rm) - 4, Y(last.score) - 4);
+      }
+    }
+    function setRunning(on) {
+      st.running = on;
+      if (on && st.testing) setTesting(false);
+      $('#arc-train').textContent = on ? 'Pause training' : (agent.steps ? 'Resume training' : 'Start training');
+    }
+    function setTesting(on) {
+      if (on && st.running) setRunning(false);
+      st.testing = on; testObs = null; st.testLast = null;
+      $('#arc-test').textContent = on ? 'Stop test drive' : 'Test drive';
+      if (!on) renderBoard(env, obs, true);
+    }
+
+    function knobSpecs() {
+      return [
+        ['lr', { label: 'Learning rate', hint: 'How big each nudge is. Too big and it overshoots.', min: 0.0001, max: 0.02, log: true, value: cfg.lr, sig: 2, fmt: (v) => v.toPrecision(2), ev: (v) => `lr ${v.toPrecision(2)}` }],
+        ['gamma', { label: 'Future discount (γ)', hint: 'How much a reward counts if it comes later. 0 = only the next step matters.', min: 0, max: 0.995, value: cfg.gamma, step: 0.005, fmt: (v) => v.toFixed(3), ev: (v) => `γ ${v.toFixed(2)}` }],
+        ['epsDecay', { label: 'Exploration fades over', hint: 'Steps until random moves drop from 100% to 5%.', min: 1000, max: 60000, log: true, value: cfg.epsDecay, step: 500, fmt: (v) => `${Math.round(v).toLocaleString()} steps`, ev: (v) => `explore ${Math.round(v / 1000)}k` }],
+        ['targetSync', { label: 'Sync frozen copy every', hint: 'How long the target stays still before it catches up with the live network.', min: 20, max: 5000, log: true, value: cfg.targetSync, step: 10, fmt: (v) => `${Math.round(v)} steps`, ev: (v) => `sync ${Math.round(v)}` }],
+        ['batch', { label: 'Memories per update', hint: 'How many random memories are graded in each nudge.', min: 1, max: 64, value: cfg.batch, step: 1, fmt: (v) => String(Math.round(v)), ev: (v) => `batch ${Math.round(v)}` }],
+        ['bufferSize', { label: 'Replay memory size', hint: 'Changing this empties the memory.', min: 500, max: 20000, log: true, value: cfg.bufferSize, step: 500, fmt: (v) => Math.round(v).toLocaleString(), ev: (v) => `memory ${Math.round(v / 1000)}k` }],
+      ];
+    }
+    function applyCfg(key, v) {
+      cfg[key] = v;
+      if (key === 'bufferSize') agent.resizeBuffer(Math.round(v));
+      else agent.cfg[key] = (key === 'batch' || key === 'targetSync') ? Math.round(v) : v;
+    }
+    function syncKnobUI() {
+      for (const [k, spec] of knobSpecs()) knobs[k].set(cfg[k] ?? spec.value, true);
+      $('#arc-replay').checked = cfg.useReplay; $('#arc-frozen').checked = cfg.useTarget; $('#arc-double').checked = cfg.double;
+    }
+    function restoreDefaults() {
+      for (const k of Object.keys(DEF)) {
+        if (k === 'bufferSize' && cfg.bufferSize === DEF.bufferSize) continue;
+        cfg[k] = DEF[k];
+        if (k === 'bufferSize') agent.resizeBuffer(DEF.bufferSize); else agent.cfg[k] = DEF[k];
+      }
+      syncKnobUI(); addEvent('defaults');
+    }
+
+    const EXPERIMENTS = [
+      { title: 'Take away the frozen copy', body: 'The target now comes from the same network you are nudging, so every nudge also moves the goalposts.', watch: "In our test run from a fresh brain, the exam score hovered around zero for 50,000 steps and never cleared more than 14% of boards. The normal setup was clearing 60% by 45,000 steps.", apply() { cfg.useTarget = false; agent.cfg.useTarget = false; return 'no frozen copy'; } },
+      { title: 'Make it short-sighted', body: 'Set the future discount to 0.5. A reward five steps away now counts for about 3% of its value.', watch: "A surprise: in this tiny maze it learned faster in our test run, clearing 90% of exam boards by 30,000 steps while the default setup was still near zero. Here the nearest pellet is almost always the right move, and a short horizon makes targets less noisy. In a bigger maze, where escaping takes planning, short-sightedness costs more.", apply() { cfg.gamma = 0.5; agent.cfg.gamma = 0.5; return 'γ 0.5'; } },
+      { title: 'Give it amnesia', body: 'Turn off replay memory. It learns from each moment once, in order, and then forgets it.', watch: "In our test run it never got off the ground: after 40,000 steps the exam score was still near random play, around −190. Back-to-back moments are nearly identical, so it keeps relearning the last few seconds and forgetting the rest.", apply() { cfg.useReplay = false; agent.cfg.useReplay = false; return 'no replay'; } },
+      { title: 'Take huge steps', body: 'Raise the learning rate to 0.01, ten times the default.', watch: "In our test run the exam score lurched between −250 and −120 for 40,000 steps and never took off. Each step overshoots, just like the overshoot you can cause on the Bench.", apply() { cfg.lr = 0.01; agent.cfg.lr = 0.01; return 'lr 0.01'; } },
+      { title: 'Never explore', body: 'Start over with a fresh brain that never makes a random move. It always does whatever it currently thinks is best.', watch: "Less dramatic than you might expect, because the ghost’s randomness and the brain’s own shifting opinions still shake things up. In our test run it reached 74% clears around 30,000 steps, then fell apart to 10%. Without deliberate exploration, progress is fragile.", apply() { cfg.epsStart = 0; cfg.epsEnd = 0; newAgent(); setRunning(true); return 'fresh, no exploring'; } },
+      { title: 'Watch a trained brain keep learning', body: 'Load the trained brain and keep training it with the default knobs.', watch: 'The exam line jumps near the top and stays there. The practice dots sit far lower: with 5% random moves, one wrong step next to the ghost costs 300 points. In our tests the same brain won 99% of games playing its best, but only 36% with random moves mixed in.', apply() { loadTrained(); setRunning(true); return null; } },
+    ];
+
+    function loadTrained() {
+      agent.live.loadBase64(TRAINED_B64);
+      agent.live.m = null; agent.live.v = null; agent.live.t = 0;
+      agent.frozen.copyFrom(agent.live);
+      agent.steps = Math.max(agent.steps, Math.round(agent.cfg.epsDecay));
+      st.loadedTrained = true;
+      obs = env.reset();
+      runExam(true);
+      addEvent('trained brain');
+      renderBoard(env, obs, true); renderStats();
+    }
+
+    function init() {
+      st.baseline = randomBaseline();
+      newAgent();
+      view = new MazeView($('#arcade-board'), env);
+      qbars = new QBars($('#arcade-q'));
+      const kroot = $('#arc-knobs');
+      for (const [k, spec] of knobSpecs()) {
+        knobs[k] = makeKnob(kroot, Object.assign({}, spec, { onInput: (v) => applyCfg(k, v), onChange: (v) => addEvent(spec.ev(v)) }));
+      }
+      const tog = (id, key, label) => $(id).addEventListener('change', (e) => { cfg[key] = e.target.checked; agent.cfg[key] = e.target.checked; addEvent(`${label} ${e.target.checked ? 'on' : 'off'}`); });
+      tog('#arc-replay', 'useReplay', 'replay'); tog('#arc-frozen', 'useTarget', 'frozen copy'); tog('#arc-double', 'double', 'double');
+      $('#arc-defaults').addEventListener('click', restoreDefaults);
+      $('#arc-train').addEventListener('click', () => setRunning(!st.running));
+      $('#arc-test').addEventListener('click', () => setTesting(!st.testing));
+      bindSeg($('#arc-speed'), (v) => { st.mode = v; });
+      $('#arc-load').addEventListener('click', loadTrained);
+      $('#arc-reset').addEventListener('click', () => { setRunning(false); setTesting(false); cfg.epsStart = DEF.epsStart; cfg.epsEnd = DEF.epsEnd; newAgent(); renderBoard(env, obs, true); renderStats(); drawCurve(); $('#arc-train').textContent = 'Start training'; });
+      $('#arc-send').addEventListener('click', () => { bench.useArcadeBrain(); selectTab('tab-bench'); $('#panel-bench').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); });
+      const list = $('#arc-experiments');
+      EXPERIMENTS.forEach((x) => {
+        const d = el('div', 'exp', list);
+        el('h4', '', d, x.title); el('p', '', d, x.body); el('p', 'watch', d, x.watch);
+        const b = el('button', 'btn', d, 'Try it'); b.type = 'button';
+        b.addEventListener('click', () => { const label = x.apply(); syncKnobUI(); if (label) addEvent(label); if (!st.running && !st.testing) setRunning(true); });
+      });
+      renderBoard(env, obs, true); renderStats();
+    }
+    function tick(ts) {
+      const vis = !panel().hidden;
+      if (st.testing) {
+        if (ts - st.lastStep >= 130) { testStep(); st.lastStep = ts; if (vis) renderBoard(testEnv, testObs); }
+      } else if (st.running) {
+        if (st.mode === 'watch') { if (ts - st.lastStep >= 120) { trainStep(); st.lastStep = ts; if (vis) renderBoard(env, obs); } }
+        else if (st.mode === 'fast') { for (let k = 0; k < 4; k++) trainStep(); if (vis) renderBoard(env, obs, true); }
+        else {
+          const t0 = performance.now();
+          do { for (let k = 0; k < 6; k++) trainStep(); } while (performance.now() - t0 < 12);
+          if (vis && ts - st.lastBoard > 120) { renderBoard(env, obs, true); st.lastBoard = ts; }
+        }
+      }
+      if (vis && ts - st.lastStats > 150) { renderStats(); st.lastStats = ts; }
+      if (vis && ts - st.lastCurve > 500 && (st.running || st.testing)) { drawCurve(); st.lastCurve = ts; }
+    }
+    function onShow() { renderBoard(st.testing ? testEnv : env, st.testing ? (testObs || testEnv.obs()) : obs, true); renderStats(); drawCurve(); }
+    return { init, tick, onShow, drawCurve, get agent() { return agent; }, get state() { return st; }, loadTrained, setRunning, cfg, _train(n) { for (let i = 0; i < n; i++) trainStep(); renderStats(); drawCurve(); } };
+  })();
+
+  // ==================================================================== BENCH
+  const bench = (() => {
+    const env = new E.MiniPac({ aggression: 1 });
+    const cellAt = (x, y) => env.cellOf[y * env.W + x];
+    const st = {
+      brainKind: 'trained', live: null, frozen: null, baseline: null, situation: null, action: 2, tool: 'pac', overlay: 'game',
+      useFrozen: true, useDouble: true, gamma: 0.97, lr: 0.003, history: [], syncs: [], scenario: 'pellet', arcadeSteps: 0, flash: '',
+    };
+    let view, nextView, barsGuess, barsPick, barsValue, cur = null;
+    const SCEN = [
+      { id: 'pellet', label: 'Pellet ahead', pac: [4, 5], ghost: [4, 1], a: 2, note: 'An ordinary step: eat a pellet, pay 1 point for the move.' },
+      { id: 'ghost', label: 'Walk into the ghost', pac: [3, 3], ghost: [4, 3], a: 3, note: 'Game over. The target is just the penalty, because there is no future to add.' },
+      { id: 'flee', label: 'Run from the ghost', pac: [3, 3], ghost: [4, 3], a: 2, note: 'You survive this step, but the ghost follows. Any danger shows up through v, the value of where you land.' },
+      { id: 'wall', label: 'Bump a wall', pac: [4, 5], ghost: [4, 1], a: 1, note: 'Walking into a wall costs a move and gains nothing, while the ghost gets closer.' },
+      { id: 'last', label: 'Last pellet', pac: [5, 5], ghost: [1, 1], a: 3, pellets: [[6, 5]], note: 'Clearing the board ends the game with a +200 bonus.' },
+      { id: 'hall', label: 'Empty hallway', pac: [4, 3], ghost: [1, 5], a: 3, rows: [1, 2, 4, 5], note: 'No pellet on this square, so the only reward is the step cost. Almost all of the target comes from the future.' },
+    ];
+    const NOTES = {
+      trained: () => `Trained in this page's engine for ${TRAINED_META.step.toLocaleString()} steps. In ${(TRAINED_META.heldOutGames || 50).toLocaleString()} fresh test games it cleared the board ${Math.round(TRAINED_META.win * 100)}% of the time. Its guesses are usually close, so look for gaps in unusual situations.`,
+      fresh: () => 'Random weights. Every guess is close to zero, so the reward dominates the target and the gaps are large.',
+      arcade: () => `A copy of the Arcade's brain after ${st.arcadeSteps.toLocaleString()} steps of training.`,
+    };
+
+    function situationFor(sc) {
+      const pellets = new Uint8Array(env.N);
+      if (sc.pellets) for (const [x, y] of sc.pellets) pellets[cellAt(x, y)] = 1;
+      else if (sc.rows) { for (let c = 0; c < env.N; c++) if (sc.rows.includes(env.xy(c)[1])) pellets[c] = 1; }
+      else pellets.set(env.pelletStart);
+      const s = { pellets, player: cellAt(...sc.pac), ghost: cellAt(...sc.ghost), ghostDir: -1, lastAction: sc.a };
+      s.ghostPrev = s.ghost; s.pellets[s.player] = 0;
+      return s;
+    }
+    function setBrain(kind) {
+      st.brainKind = kind;
+      if (kind === 'trained') st.live = newTrainedBrain();
+      else if (kind === 'fresh') st.live = new E.MLP([116, ...HIDDEN, 4], 7);
+      else { st.live = arcade.agent.live.clone(); st.arcadeSteps = arcade.agent.steps; }
+      st.frozen = st.live.clone(); st.baseline = st.live.clone();
+      st.history = []; st.syncs = [];
+      setSeg($('#bench-brain'), kind);
+      $('#bench-brain-note').textContent = NOTES[kind]();
+      render();
+    }
+    function loadScenario(id) {
+      const sc = SCEN.find((s) => s.id === id);
+      st.scenario = id; st.situation = situationFor(sc); st.action = sc.a; st.history = []; st.syncs = []; st.flash = '';
+      render();
+    }
+
+    function compute() {
+      const s = st.situation, a = st.action;
+      const oS = env.encode(s);
+      env.setState({ ...s, pellets: s.pellets, steps: 0, score: 0, done: false, dead: false, won: false });
+      const res = env.step(a, { deterministicGhost: true });
+      const s2 = env.getState();
+      const r = res.reward * SCALE;
+      const qS = st.live.forward(oS);
+      let qPick = null, qVal = null, aStar = -1, v = 0;
+      if (!res.terminal) {
+        qPick = st.live.forward(res.obs);
+        qVal = st.useFrozen ? st.frozen.forward(res.obs) : qPick;
+        aStar = st.useDouble ? E.argmax(qPick) : E.argmax(qVal);
+        v = qVal[aStar];
+      }
+      const q = qS[a], target = r + st.gamma * v, gap = q - target;
+      return { oS, s2, res, r, qS, q, qPick, qVal, aStar, v, target, gap, loss: E.huber(gap) };
+    }
+
+    function nudge(n) {
+      let c = compute();
+      if (!st.history.length) st.history.push({ q: c.q, t: c.target });
+      const d = new Float32Array(4);
+      for (let k = 0; k < n; k++) {
+        st.live.forward(c.oS);
+        d.fill(0); d[st.action] = E.huberGrad(c.gap);
+        st.live.backward(d); st.live.sgdStep(st.lr, 0);
+        c = compute();
+        st.history.push({ q: c.q, t: c.target });
+      }
+      if (st.history.length > 600) { const drop = st.history.length - 600; st.history.splice(0, drop); st.syncs = st.syncs.map((i) => i - drop).filter((i) => i >= 0); }
+      render();
+    }
+
+    function hypothetical(c) { const h = { ...st.situation, pellets: Uint8Array.from(st.situation.pellets), player: c }; h.pellets[c] = 0; return h; }
+    function overlayData() {
+      const N = env.N, s = st.situation;
+      if (st.overlay === 'value') {
+        const V = new Array(N).fill(null), arrows = new Array(N).fill(-1);
+        let lo = Infinity, hi = -Infinity;
+        for (let c = 0; c < N; c++) {
+          if (c === s.ghost) continue;
+          const q = st.live.forward(env.encode(hypothetical(c)));
+          V[c] = Math.max(...q); arrows[c] = E.argmax(q);
+          lo = Math.min(lo, V[c]); hi = Math.max(hi, V[c]);
+        }
+        const norm = V.map((v) => v == null ? null : (hi - lo < 1e-6 ? 0 : ((v - lo) / (hi - lo)) * 2 - 1));
+        return { norm, arrows, labels: V.map((v) => v == null ? '' : num(v, 2)), lo, hi };
+      }
+      if (st.overlay === 'ripple') {
+        const D = new Array(N).fill(null); let m = 0, ext = 0;
+        for (let c = 0; c < N; c++) {
+          if (c === s.ghost) continue;
+          const o = env.encode(hypothetical(c));
+          D[c] = st.live.forward(o)[st.action] - st.baseline.forward(o)[st.action];
+          if (Math.abs(D[c]) > m) { m = Math.abs(D[c]); ext = D[c]; }
+        }
+        const norm = D.map((d) => d == null ? null : (m < 1e-4 ? 0 : d / m));
+        return { norm, labels: D.map((d) => d == null ? '' : (m < 1e-4 ? '' : sgn(d, 2))), maxAbs: m, ext };
+      }
+      return null;
+    }
+
+    function drawChart() {
+      const cv = $('#bench-chart');
+      if (!cv || $('#panel-bench').hidden) return;
+      const { ctx, w, h } = fitCanvas(cv);
+      const H = st.history, ink2 = cssVar('--ink-3');
+      ctx.font = '11px ' + cssVar('--font');
+      if (H.length < 2) { ctx.fillStyle = ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('The guess and the target will be plotted here as you nudge.', w / 2, h / 2); return; }
+      const L = 40, R = 10, T = 12, B = 22;
+      let lo = Infinity, hi = -Infinity;
+      for (const p of H) { lo = Math.min(lo, p.q, p.t); hi = Math.max(hi, p.q, p.t); }
+      const pad = (hi - lo) * 0.15 || 0.1; lo -= pad; hi += pad;
+      const X = (i) => L + (i / (H.length - 1)) * (w - L - R), Y = (v) => T + ((hi - v) / (hi - lo)) * (h - T - B);
+      ctx.fillStyle = ink2; ctx.strokeStyle = ink2; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
+      for (const t of niceTicks(lo, hi, 3)) { ctx.globalAlpha = .3; ctx.beginPath(); ctx.moveTo(L, Y(t)); ctx.lineTo(w - R, Y(t)); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillText(num(t, Math.abs(hi - lo) < 0.5 ? 2 : 1), L - 5, Y(t)); }
+      ctx.strokeStyle = cssVar('--frozen'); ctx.setLineDash([3, 3]);
+      for (const i of st.syncs) { ctx.beginPath(); ctx.moveTo(X(i), T); ctx.lineTo(X(i), h - B); ctx.stroke(); }
+      ctx.setLineDash([]);
+      const line = (key, color, width) => { ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath(); H.forEach((p, i) => (i ? ctx.lineTo(X(i), Y(p[key])) : ctx.moveTo(X(i), Y(p[key])))); ctx.stroke(); };
+      line('t', cssVar('--target'), 2.5);
+      line('q', cssVar('--guess'), 2.5);
+      ctx.fillStyle = ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(`nudges (${H.length - 1})`, L + (w - L - R) / 2, h - 5);
+    }
+
+    const PART_LABEL = { step: 'step', pellet: 'pellet', caught: 'caught', cleared: 'board cleared' };
+    function render() {
+      if (!st.live || !st.situation) return;
+      cur = compute();
+      const c = cur, s = st.situation, a = st.action;
+      // boards
+      const ov = overlayData();
+      view.render({ ...s, lastAction: a, dead: false }, ov);
+      const dest = env.nbr[s.player][a];
+      view.setRing(st.overlay === 'game' && dest >= 0 ? dest : -1);
+      nextView.instant(true);
+      nextView.render(c.s2);
+      const note = $('#bench-overlay-note');
+      if (st.flash) note.textContent = st.flash;
+      else if (st.overlay === 'value') note.textContent = `Value map: the best q the live network gives each square if Pac-Man stood there (ghost and pellets as shown). Greener means worth more than the other squares, redder means worth less. Arrows show the move it would pick. Range ${num(ov.lo)} to ${num(ov.hi)}.`;
+      else if (st.overlay === 'ripple') note.textContent = ov.maxAbs < 1e-4 ? 'Ripple: nothing has changed yet. Nudge the weights, then come back here to see which other squares moved.' : `Ripple: how much q(${MOVE[a]}) changed since this brain was loaded, for every square Pac-Man could stand on. You only trained on one square, yet others moved: the weights are shared. Largest change ${sgn(ov.ext)}.`;
+      else { const sc = SCEN.find((x) => x.id === st.scenario); note.textContent = sc ? sc.note : 'Your own situation. Pick a move with the arrows.'; }
+      $$('#bench-scenarios .chip').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === st.scenario)));
+      $$('#bench-pad button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.a === a)));
+      // reward parts
+      const parts = $('#bench-parts'); parts.textContent = '';
+      for (const [k, v] of c.res.parts) el('span', 'rpart ' + (v < 0 ? 'neg' : 'pos'), parts, `${PART_LABEL[k]} ${pts(v)}`);
+      if (c.res.bumped) el('span', 'rpart', parts, 'hit a wall');
+      if (c.res.terminal) el('span', 'rpart end', parts, 'Game over');
+      html($('#bench-rline'), `Reward: <b class="num">${pts(c.res.reward)}</b> points × 0.01 = <b class="num c-reward">r = ${sgn(c.r)}</b>`);
+      // step 1
+      barsGuess.render(c.qS, { hi: a, cls: 'guess' });
+      $('#ro-move').textContent = MOVE[a];
+      $('#ro-q').textContent = num(c.q);
+      // step 2
+      const pair = $('#future-pair'), over = $('#future-over'), ft = $('#future-text');
+      if (c.res.terminal) {
+        pair.hidden = true; over.hidden = false;
+        ft.textContent = 'Normally we would ask the network what board S′ is worth.';
+      } else {
+        pair.hidden = false; over.hidden = true;
+        const rng = [Math.min(...c.qPick, ...c.qVal), Math.max(...c.qPick, ...c.qVal)];
+        if (!st.useFrozen) {
+          pair.classList.add('single'); $('#bars-value').parentElement.hidden = true;
+          $('#cap-picker').textContent = 'Live network picks the best next move and scores it';
+          barsPick.render(c.qPick, { hi: c.aStar, star: c.aStar, cls: 'live', range: rng });
+          ft.textContent = 'No frozen copy: the live network scores board S′ itself. That means every nudge you make will move the target as well.';
+        } else {
+          pair.classList.remove('single'); $('#bars-value').parentElement.hidden = false;
+          if (st.useDouble) {
+            $('#cap-picker').textContent = 'Live network picks the best next move';
+            $('#cap-valuer').textContent = 'Frozen copy says what it is worth';
+            barsPick.render(c.qPick, { hi: c.aStar, star: c.aStar, cls: 'live', range: rng });
+            ft.innerHTML = 'From board S′ the <span class="hl hl-live">live network</span> picks the move that looks best (★). The <span class="hl hl-frozen">frozen copy</span>, an older snapshot of the same network, says what that move is worth. Splitting the jobs keeps one network\u2019s optimism from feeding on itself.';
+          } else {
+            $('#cap-picker').textContent = 'Live network (not used for v)';
+            $('#cap-valuer').textContent = 'Frozen copy picks the best move and scores it';
+            barsPick.render(c.qPick, { hi: -1, range: rng });
+            ft.innerHTML = 'Plain DQN: the <span class="hl hl-frozen">frozen copy</span> both picks the best move from S′ (★) and scores it. Taking the biggest of several noisy guesses tends to overestimate, which is why Double DQN splits the jobs.';
+          }
+          barsValue.render(c.qVal, { hi: c.aStar, star: st.useDouble ? -1 : c.aStar, cls: 'frozen', range: rng });
+        }
+      }
+      $('#ro-v').textContent = num(c.v);
+      // step 3
+      const g = st.gamma.toFixed(2);
+      html($('#bench-formula'), `
+        <span class="lhs">target =</span><span class="rhs"><span class="c-reward">r</span> + γ × <span class="c-frozen">v</span></span>
+        <span class="lhs">=</span><span class="rhs"><span class="c-reward">${sgn(c.r)}</span> + ${g} × <span class="c-frozen">${c.res.terminal ? '0' : num(c.v)}</span>${c.res.terminal ? ' <span class="dim">(game over)</span>' : ''}</span>
+        <span class="lhs">=</span><span class="rhs total">${num(c.target)}</span>`);
+      // step 4
+      drawGap(c);
+      $('#ro-gap').textContent = sgn(c.gap);
+      $('#ro-loss').textContent = c.loss.toFixed(4);
+      const ag = Math.abs(c.gap);
+      let words = ag < 0.02 ? 'Almost no gap: the brain already agrees with the evidence, so this memory would teach it very little.'
+        : ag < 0.3 ? (c.gap < 0 ? 'The guess is a little too low. A nudge will raise it slightly.' : 'The guess is a little too high. A nudge will lower it slightly.')
+        : (c.gap < 0 ? 'A big gap: the brain underrated this move. Surprises like this are where most learning happens.' : 'A big gap: the brain overrated this move. Surprises like this are where most learning happens.');
+      if (ag > 1) words += ' Because the gap is bigger than 1, the loss grows in a straight line instead of squaring, so one surprising memory can\u2019t yank the weights too hard.';
+      $('#gap-words').textContent = words;
+      // step 5
+      $('#nudge-words').textContent = nudgeWords(c);
+      drawChart();
+    }
+    function nudgeWords(c) {
+      const H = st.history;
+      if (H.length < 2) return 'Press a nudge button to watch the guess move toward the target.';
+      const n = H.length - 1, q0 = H[0].q, t0 = H[0].t;
+      const lastSync = st.syncs.length ? st.syncs[st.syncs.length - 1] : -1;
+      const recent = H.slice(-8).map((p) => p.q - p.t);
+      let flips = 0; for (let i = 1; i < recent.length; i++) if (Math.sign(recent[i]) !== Math.sign(recent[i - 1]) && Math.abs(recent[i]) > 0.01) flips++;
+      if (flips >= 3 || Math.abs(c.gap) > Math.abs(H[0].q - H[0].t) * 1.5 + 0.05) return `The steps are too big: q is overshooting the target and bouncing back and forth. Lower the learning rate and press Undo all nudges.`;
+      if (lastSync === H.length - 1) return 'Syncing copied the live weights into the frozen copy, so the target jumped to reflect everything the live network has learned. In real training this happens every few hundred steps.';
+      if (Math.abs(c.target - t0) > 0.02 && !st.useFrozen) return `After ${n} nudges q went from ${num(q0)} to ${num(c.q)}, but the target moved too, from ${num(t0)} to ${num(c.target)}. With no frozen copy the network is chasing its own tail.`;
+      if (Math.abs(c.target - t0) > 0.02) return `After ${n} nudges q went from ${num(q0)} to ${num(c.q)}. The target moved from ${num(t0)} to ${num(c.target)} because the live network changed its mind about which next move is best, or because of a sync.`;
+      return `After ${n} nudges q went from ${num(q0)} to ${num(c.q)}. The target stayed at ${num(c.target)} because the frozen copy didn\u2019t change.${Math.abs(c.gap) < 0.01 ? ' The gap is closed: this memory has nothing left to teach.' : ''} Switch the board to Ripple to see what else moved.`;
+    }
+    function drawGap(c) {
+      const root = $('#bench-gapviz');
+      if (!root._b) {
+        root._b = {
+          gap: el('div', 'gv-gap', root), axis: el('div', 'gv-axis', root), axl: el('div', 'gv-axis-label num', root, '0'),
+          g: el('div', 'gv-bar g', root), t: el('div', 'gv-bar t', root), gl: el('div', 'gv-lab', root), tl: el('div', 'gv-lab', root),
+        };
+      }
+      const b = root._b;
+      let lo = Math.min(0, c.q, c.target), hi = Math.max(0, c.q, c.target);
+      const pad = (hi - lo) * 0.3 || 0.2; lo -= pad; hi += pad;
+      const X = (v) => ((v - lo) / (hi - lo)) * 100;
+      const x0 = X(0);
+      b.axis.style.left = x0 + '%'; b.axl.style.left = x0 + '%';
+      const bar = (node, v) => { const xv = X(v); node.style.left = Math.min(x0, xv) + '%'; node.style.width = `max(2px, ${Math.abs(xv - x0)}%)`; };
+      bar(b.g, c.q); bar(b.t, c.target);
+      const lab = (node, v, text, top, cls) => {
+        const xv = X(v), inside = v >= 0 ? xv > 70 : xv < 30;
+        node.className = 'gv-lab ' + cls + (inside ? ' inside' : ''); node.innerHTML = text; node.style.top = top + 'px';
+        if (v >= 0) { node.style.left = `calc(${xv}% + 6px)`; node.style.transform = xv > 70 ? 'translateX(calc(-100% - 12px))' : ''; }
+        else { node.style.left = `calc(${xv}% - 6px)`; node.style.transform = xv < 30 ? 'translateX(12px)' : 'translateX(-100%)'; }
+      };
+      lab(b.gl, c.q, `guess <span class="num">${num(c.q)}</span>`, 4, 'c-guess');
+      lab(b.tl, c.target, `target <span class="num">${num(c.target)}</span>`, 34, 'c-target');
+      const xa = X(Math.min(c.q, c.target)), xb = X(Math.max(c.q, c.target));
+      b.gap.style.left = xa + '%'; b.gap.style.width = `max(2px, ${xb - xa}%)`;
+    }
+
+    function tap(c) {
+      const s = st.situation; st.flash = '';
+      if (st.tool === 'pac') {
+        if (c === s.ghost) { st.flash = 'Pac-Man can\u2019t start on the ghost\u2019s square. Move the ghost first.'; render(); return; }
+        s.player = c; s.pellets[c] = 0;
+      } else if (st.tool === 'ghost') {
+        if (c === s.player) { st.flash = 'The ghost can\u2019t start on Pac-Man\u2019s square.'; render(); return; }
+        s.ghost = c; s.ghostPrev = c;
+      } else {
+        if (c === s.player) { st.flash = 'Pac-Man has already eaten whatever was on his square.'; render(); return; }
+        s.pellets[c] ^= 1;
+      }
+      st.scenario = null; st.history = []; st.syncs = [];
+      render();
+    }
+    function setAction(a) { st.action = a; st.history = []; st.syncs = []; st.flash = ''; render(); }
+
+    function init() {
+      view = new MazeView($('#bench-board'), env, { onTap: tap });
+      view.instant(true);
+      nextView = new MazeView($('#bench-next'), env, { mini: true });
+      barsGuess = new QBars($('#bars-guess')); barsPick = new QBars($('#bars-pick')); barsValue = new QBars($('#bars-value'));
+      const chips = $('#bench-scenarios');
+      for (const sc of SCEN) { const b = el('button', 'chip', chips, sc.label); b.type = 'button'; b.dataset.id = sc.id; b.addEventListener('click', () => loadScenario(sc.id)); }
+      bindSeg($('#bench-brain'), setBrain);
+      bindSeg($('#bench-overlay'), (v) => { st.overlay = v; st.flash = ''; render(); });
+      bindSeg($('#bench-tool'), (v) => { st.tool = v; });
+      $$('#bench-pad button').forEach((b) => b.addEventListener('click', () => setAction(+b.dataset.a)));
+      $('#panel-bench').addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, select')) return;
+        const k = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3 }[e.key];
+        if (k != null && e.target.closest('#bench-board, #bench-pad')) { e.preventDefault(); setAction(k); }
+      });
+      $('#bench-frozen').addEventListener('change', (e) => { st.useFrozen = e.target.checked; $('#bench-double').disabled = !st.useFrozen; render(); });
+      $('#bench-double').addEventListener('change', (e) => { st.useDouble = e.target.checked; render(); });
+      makeKnob($('#bench-gamma-knob'), { label: 'Future discount (γ)', hint: 'How much “where you landed” counts. At 0, only the immediate reward matters.', min: 0, max: 0.995, value: st.gamma, step: 0.005, fmt: (v) => v.toFixed(3), onInput: (v) => { st.gamma = v; render(); } });
+      makeKnob($('#bench-lr-knob'), { label: 'Learning rate', hint: 'Size of each nudge. Try 0.01 or more to see what overshooting looks like.', min: 0.0003, max: 0.05, log: true, value: st.lr, sig: 2, fmt: (v) => v.toPrecision(2), onInput: (v) => { st.lr = v; } });
+      $$('[data-nudge]').forEach((b) => b.addEventListener('click', () => nudge(+b.dataset.nudge)));
+      $('#bench-sync').addEventListener('click', () => { if (!st.history.length) st.history.push({ q: cur.q, t: cur.target }); st.frozen.copyFrom(st.live); const c = compute(); st.history.push({ q: c.q, t: c.target }); st.syncs.push(st.history.length - 1); render(); });
+      $('#bench-undo').addEventListener('click', () => { st.live.copyFrom(st.baseline); st.frozen.copyFrom(st.baseline); st.history = []; st.syncs = []; render(); });
+      $('#param-count').textContent = new E.MLP([116, ...HIDDEN, 4], 1).paramCount.toLocaleString();
+      const rk = $('#bench-reward-knobs'), rknobs = {};
+      const R = [['pellet', 'Pellet', 0, 50, 1], ['step', 'Each move', -10, 0, 0.5], ['death', 'Caught by the ghost', -1000, 0, 10], ['clear', 'Board cleared', 0, 500, 10]];
+      for (const [k, label, min, max, step] of R) rknobs[k] = makeKnob(rk, { label, min, max, step, value: E.DEFAULT_REWARDS[k], fmt: (v) => pts(v), onInput: (v) => { env.rewards[k] = v; render(); } });
+      $('#bench-reward-reset').addEventListener('click', () => { for (const [k] of R) { env.rewards[k] = E.DEFAULT_REWARDS[k]; rknobs[k].set(E.DEFAULT_REWARDS[k], true); } render(); });
+      st.situation = situationFor(SCEN[0]);
+      setBrain('trained');
+    }
+    function useArcadeBrain() { setBrain('arcade'); }
+    return { init, render, onShow: () => { render(); }, useArcadeBrain, get state() { return st; }, compute, nudge, loadScenario, setAction, setBrain };
+  })();
+
+  // ===================================================================== TANK
+  const tank = (() => {
+    const world = new E.GridWorld(7, 6);
+    const NS = world.W * world.H;
+    const st = {
+      kind: 'table', table: new E.TableQ(NS), net: null, frozen: null, buffer: [], agent: -1, epSteps: 0, episodes: 0, updates: 0, sweeps: 0,
+      running: false, gamma: 0.9, eps: 0.3, alpha: 0.5, lrNet: 0.01, speed: 6, showNums: false, tool: '1', last: null, acc: 0, lastT: 0,
+      rng: E.makeRng(21), sinceSync: 0,
+    };
+    let cells = [], pac, knobs = {};
+    function resetNet() { st.net = new E.NetQ(world, 32, 5 + ((Math.random() * 1000) | 0)); st.frozen = st.net.snapshot(); st.buffer = []; st.sinceSync = 0; }
+    resetNet();
+    const brain = () => (st.kind === 'table' ? st.table : st.net);
+
+    function build() {
+      const root = $('#tank-board'); root.textContent = '';
+      root.style.setProperty('--cols', world.W); root.style.setProperty('--rows', world.H);
+      cells = [];
+      for (let s = 0; s < NS; s++) {
+        const b = el('button', 'tcell', root); b.type = 'button';
+        b.setAttribute('aria-label', `Square in column ${(s % world.W) + 1}, row ${Math.floor(s / world.W) + 1}`);
+        const tint = el('div', 'tint', b), icon = el('div', 'icon', b), val = el('div', 'cval', b), arr = el('div', 'carr', b);
+        arr.hidden = true;
+        b.addEventListener('click', () => tap(s));
+        cells.push({ b, tint, icon, val, arr });
+      }
+      pac = el('div', 'actor pac', root); pac.hidden = true;
+    }
+    function place(s) { const x = s % world.W, y = Math.floor(s / world.W); pac.style.transform = `translate(calc(${x * 100}% + ${x * 3}px), calc(${y * 100}% + ${y * 3}px))`; }
+
+    function tap(s) {
+      const t = +st.tool;
+      if (world.type[s] === t) return;
+      world.type[s] = t;
+      if (st.agent === s || !world.isState(st.agent)) st.agent = -1;
+      render();
+    }
+    function knownCount() {
+      let known = 0, total = 0;
+      for (const s of world.states()) { total++; const q = brain().values(s); if (Math.max(...q) > 0.1) known++; }
+      return [known, total];
+    }
+    function stepOnce() {
+      if (st.agent < 0 || !world.isState(st.agent)) {
+        st.agent = world.randomStart(); st.epSteps = 0;
+        if (st.agent < 0) return false;
+        st.episodes++;
+      }
+      const s = st.agent, q = brain().values(s);
+      const a = st.rng() < st.eps ? st.rng.int(4) : tieArgmax(q, st.rng);
+      const tr = world.transition(s, a);
+      let guess, target, after, v;
+      if (st.kind === 'table') {
+        v = tr.terminal ? 0 : Math.max(...st.table.values(tr.next));
+        target = tr.reward + st.gamma * v;
+        guess = st.table.update(s, a, target, st.alpha);
+        after = st.table.values(s)[a];
+      } else {
+        st.buffer.push({ s, a, next: tr.next, reward: tr.reward, terminal: tr.terminal });
+        if (st.buffer.length > 2000) st.buffer.shift();
+        v = tr.terminal ? 0 : Math.max(...st.frozen.values(tr.next));
+        target = tr.reward + st.gamma * v; guess = q[a];
+        const batch = [{ s, a, target }];
+        for (let k = 0; k < 15; k++) {
+          const b = st.buffer[st.rng.int(st.buffer.length)];
+          batch.push({ s: b.s, a: b.a, target: b.reward + (b.terminal ? 0 : st.gamma * Math.max(...st.frozen.values(b.next))) });
+        }
+        st.net.train(batch, st.lrNet);
+        after = st.net.values(s)[a];
+        if (++st.sinceSync >= 30) { st.frozen = st.net.snapshot(); st.sinceSync = 0; }
+      }
+      st.updates++; st.epSteps++;
+      st.last = { s, a, next: tr.next, r: tr.reward, v, guess, target, after, terminal: tr.terminal };
+      st.agent = tr.terminal || st.epSteps >= world.maxSteps ? -1 : tr.next;
+      return true;
+    }
+    function sweep() {
+      const states = world.states();
+      if (!states.length) return;
+      if (st.kind === 'table') {
+        const snap = st.table.snapshot();
+        for (const s of states) for (let a = 0; a < 4; a++) {
+          const tr = world.transition(s, a);
+          st.table.update(s, a, tr.reward + (tr.terminal ? 0 : st.gamma * Math.max(...snap.values(tr.next))), 1);
+        }
+        st.updates += states.length * 4;
+      } else {
+        const snap = st.net.snapshot(), batch = [];
+        for (const s of states) for (let a = 0; a < 4; a++) {
+          const tr = world.transition(s, a);
+          batch.push({ s, a, target: tr.reward + (tr.terminal ? 0 : st.gamma * Math.max(...snap.values(tr.next))) });
+        }
+        for (let k = 0; k < 15; k++) st.net.train(batch, st.lrNet);
+        st.frozen = st.net.snapshot(); st.updates += 15;
+      }
+      st.sweeps++; st.agent = -1;
+      st.last = { sweep: true };
+    }
+    const where = (s) => `column ${(s % world.W) + 1}, row ${Math.floor(s / world.W) + 1}`;
+    function render() {
+      const scale = Math.max(Math.abs(world.rewards.cherry), Math.abs(world.rewards.ghost), 1);
+      const b = brain();
+      for (let s = 0; s < NS; s++) {
+        const c = cells[s], t = world.type[s];
+        c.b.className = 'tcell' + (t === E.WALL ? ' wall' : t === E.CHERRY ? ' cherry' : t === E.GHOST ? ' ghostc' : '');
+        if (t !== E.EMPTY) { c.tint.style.background = ''; c.val.textContent = ''; c.arr.hidden = true; continue; }
+        const q = b.values(s), V = Math.max(...q), spread = V - Math.min(...q);
+        c.tint.style.background = heat(V / scale);
+        c.val.textContent = st.showNums ? num(V, 1) : '';
+        const show = spread > 0.05;
+        c.arr.hidden = !show;
+        if (show) c.arr.style.setProperty('--rot', ARR_ROT[E.argmax(q)] + 'deg');
+      }
+      if (st.last && !st.last.sweep) { cells[st.last.s].b.classList.add('flash-guess'); if (!st.last.terminal && st.last.next !== st.last.s) cells[st.last.next].b.classList.add('flash-next'); }
+      pac.hidden = st.agent < 0; if (st.agent >= 0) place(st.agent);
+      // readout
+      const L = st.last, lu = $('#tank-last');
+      if (!L) lu.innerHTML = 'Nothing learned yet. Press <b>Explore</b> to let Pac-Man wander, or <b>Sweep</b> to grade every square at once.';
+      else if (L.sweep) {
+        const [k, tot] = knownCount();
+        lu.innerHTML = `Sweep ${st.sweeps}: every square graded once${st.kind === 'table' ? ', each against a frozen snapshot of the map from before the sweep' : ' against a frozen copy of the network, then 15 nudges'}. <b>${k} of ${tot}</b> squares now know about the cherry.`;
+      } else {
+        lu.innerHTML = `From ${where(L.s)}, moved ${GLYPH[L.a]}${L.terminal ? (L.r > 0 ? ' onto the cherry' : ' into the ghost') : ''}.<br>
+          target = <span class="num c-reward">${sgn(L.r)}</span> + ${st.gamma.toFixed(2)} × <span class="num c-frozen">${num(L.v)}</span> = <span class="num c-target">${num(L.target)}</span>${L.terminal ? ' (game over, v = 0)' : ''}<br>
+          guess was <span class="num c-guess">${num(L.guess)}</span>, now <span class="num c-guess">${num(L.after)}</span>`;
+      }
+      const [k, tot] = knownCount();
+      const dl = $('#tank-stats');
+      html(dl, `<div><dt>Games</dt><dd>${st.episodes.toLocaleString()}</dd></div><div><dt>Updates</dt><dd>${st.updates.toLocaleString()}</dd></div>
+        <div><dt>Squares that know about the cherry</dt><dd>${k} of ${tot}</dd></div>
+        <div><dt>${st.kind === 'table' ? 'Numbers in the table' : 'Weights in the network'}</dt><dd>${st.kind === 'table' ? (tot * 4).toLocaleString() : st.net.net.paramCount.toLocaleString()}</dd></div>`);
+    }
+    function clearFlashes() { cells.forEach((c) => c.b.classList.remove('flash-guess', 'flash-next')); }
+    function setRunning(on) { st.running = on; $('#tank-run').textContent = on ? 'Pause' : 'Explore'; st.lastT = 0; st.acc = 0; }
+    function brainNote() {
+      $('#tank-brain-note').textContent = st.kind === 'table'
+        ? 'One number per square per move. Updating one square changes only that square.'
+        : `A ${st.net.net.paramCount}-weight network that sees only the column and row. Squares share weights, so one update tints many squares. It also uses replay memory and a frozen copy, like the real DQN.`;
+      knobs.alpha.wrap.hidden = st.kind !== 'table'; knobs.lrNet.wrap.hidden = st.kind === 'table';
+    }
+    function init() {
+      build();
+      bindSeg($('#tank-tool'), (v) => { st.tool = v; });
+      bindSeg($('#tank-brain'), (v) => { st.kind = v; st.last = null; clearFlashes(); brainNote(); render(); });
+      $('#tank-run').addEventListener('click', () => setRunning(!st.running));
+      $('#tank-step').addEventListener('click', () => { setRunning(false); clearFlashes(); stepOnce(); render(); });
+      $('#tank-sweep').addEventListener('click', () => { setRunning(false); clearFlashes(); sweep(); render(); });
+      $('#tank-reset').addEventListener('click', () => {
+        setRunning(false);
+        if (st.kind === 'table') st.table = new E.TableQ(NS); else resetNet();
+        st.episodes = 0; st.updates = 0; st.sweeps = 0; st.agent = -1; st.last = null; clearFlashes(); render();
+      });
+      $('#tank-nums').addEventListener('change', (e) => { st.showNums = e.target.checked; render(); });
+      const K = $('#tank-knobs');
+      knobs.speed = makeKnob(K, { label: 'Exploring speed', min: 1, max: 300, log: true, value: st.speed, sig: 2, fmt: (v) => `${Math.round(v)} moves/s`, onInput: (v) => { st.speed = v; } });
+      knobs.gamma = makeKnob(K, { label: 'Future discount (γ)', hint: 'Each step away from the cherry multiplies its value by this.', min: 0, max: 0.99, step: 0.01, value: st.gamma, onInput: (v) => { st.gamma = v; } });
+      knobs.eps = makeKnob(K, { label: 'Random-move chance (ε)', hint: 'How often Pac-Man ignores the map and wanders.', min: 0, max: 1, step: 0.01, value: st.eps, onInput: (v) => { st.eps = v; } });
+      knobs.alpha = makeKnob(K, { label: 'Learning rate', hint: 'For the table: how far each update moves the guess toward the target (1 = all the way).', min: 0.05, max: 1, step: 0.05, value: st.alpha, onInput: (v) => { st.alpha = v; } });
+      knobs.lrNet = makeKnob(K, { label: 'Learning rate', hint: 'For the network: the size of each Adam step.', min: 0.001, max: 0.05, log: true, sig: 2, value: st.lrNet, fmt: (v) => v.toPrecision(2), onInput: (v) => { st.lrNet = v; } });
+      knobs.step = makeKnob(K, { label: 'Cost per move', hint: 'A small penalty for every move makes long routes worse.', min: -1, max: 0, step: 0.05, value: 0, fmt: (v) => num(v), onInput: (v) => { world.rewards.step = v; } });
+      brainNote();
+      render();
+    }
+    function tick(ts) {
+      if (!st.running) return;
+      if (!st.lastT) { st.lastT = ts; return; }
+      st.acc += ((ts - st.lastT) / 1000) * st.speed; st.lastT = ts;
+      let n = Math.min(Math.floor(st.acc), 80);
+      if (n <= 0) return;
+      st.acc -= n;
+      clearFlashes();
+      $('#tank-board').classList.toggle('instant', st.speed > 20 || reduceMotion);
+      while (n-- > 0) if (!stepOnce()) break;
+      if (!$('#panel-tank').hidden) render();
+    }
+    return { init, tick, onShow: render, get state() { return st; }, world, sweep, stepOnce, render };
+  })();
+
+  // ===================================================================== TABS
+  const TABS = { 'tab-bench': bench, 'tab-tank': tank, 'tab-arcade': arcade };
+  function selectTab(id) {
+    $$('.tab').forEach((t) => {
+      const on = t.id === id;
+      t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1;
+      $('#' + t.getAttribute('aria-controls')).hidden = !on;
+    });
+    TABS[id].onShow();
+  }
+  function initTabs() {
+    const tabs = $$('.tab');
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => selectTab(t.id));
+      t.addEventListener('keydown', (e) => {
+        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!d) return;
+        const n = tabs[(i + d + tabs.length) % tabs.length]; n.focus(); selectTab(n.id);
+      });
+    });
+  }
+
+  function redrawCharts() { if (!$('#panel-bench').hidden) bench.render(); arcade.drawCurve(); }
+
+  function boot() {
+    initTabs();
+    arcade.init();
+    bench.init();
+    tank.init();
+    requestAnimationFrame(() => requestAnimationFrame(() => $('.equation').classList.add('eq-drawn')));
+    const loop = (ts) => { tank.tick(ts); arcade.tick(ts); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+    let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawCharts, 120); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawCharts);
+    new MutationObserver(redrawCharts).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCharts);
+    window.__workshop = { bench, tank, arcade, selectTab };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+</body>
+</html>

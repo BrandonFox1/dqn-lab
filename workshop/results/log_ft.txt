@@ -1,0 +1,16 @@
+brain_A on selection set {"score":389.1,"win":0.95,"len":56.8}
+ft step 5000 {"score":368.6,"win":0.93,"len":57.8}
+ft step 10000 {"score":381.7,"win":0.95,"len":55.7}
+ft step 15000 {"score":384.9,"win":0.94,"len":54.7}
+ft step 20000 {"score":400.7,"win":0.96,"len":52.9}
+ft step 25000 {"score":393.9,"win":0.97,"len":58.9}
+ft step 30000 {"score":394.5,"win":0.96,"len":55.3}
+ft step 35000 {"score":395.9,"win":0.96,"len":53.1}
+ft step 40000 {"score":384.9,"win":0.92,"len":59}
+ft step 45000 {"score":384.1,"win":0.94,"len":51.2}
+ft step 50000 {"score":403.6,"win":0.97,"len":49.9}
+ft step 55000 {"score":400.6,"win":0.97,"len":53.1}
+ft step 60000 {"score":355.1,"win":0.89,"len":54.1}
+HELD-OUT brain_A {"score":390.8,"win":0.956,"len":55.1}
+HELD-OUT finetuned (ft step 50000) {"score":407.9,"win":0.978,"len":50.5}
+picked {"score":407.9,"win":0.978,"len":50.5} step 135000

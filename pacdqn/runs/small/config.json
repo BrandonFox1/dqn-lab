@@ -1,0 +1,49 @@
+{
+  "steps": 60000,
+  "seed": 0,
+  "out": "runs/small",
+  "device": "cpu",
+  "eval_every": 10000,
+  "eval_episodes": 20,
+  "log_every": 20,
+  "resume": true,
+  "env": {
+    "maze": "small",
+    "n_ghosts": 1,
+    "lives": 1,
+    "max_steps": 500,
+    "power_duration": 20,
+    "ghost_respawn": 10,
+    "ghost_speed": 1.0,
+    "frightened_speed": 0.5,
+    "ghost_aggression": [
+      0.9,
+      0.7,
+      0.5,
+      0.3
+    ],
+    "rewards": {
+      "pellet": 10.0,
+      "power": 50.0,
+      "ghost": 200.0,
+      "clear": 500.0,
+      "death": -500.0,
+      "step": -1.0
+    }
+  },
+  "agent": {
+    "gamma": 0.99,
+    "lr": 0.00025,
+    "batch_size": 32,
+    "buffer_size": 50000,
+    "learning_starts": 2000,
+    "train_every": 4,
+    "target_update": 1000,
+    "eps_start": 1.0,
+    "eps_end": 0.05,
+    "eps_decay_steps": 30000,
+    "reward_scale": 0.01,
+    "grad_clip": 10.0,
+    "hidden": 256
+  }
+}

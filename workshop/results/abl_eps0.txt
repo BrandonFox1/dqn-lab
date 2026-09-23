@@ -1,0 +1,9 @@
+random baseline -279.7 params 11908
+eps0 step 5000 eval -185.0 win 0% len 28 eps 0.00 loss 0.0350 455 sps
+eps0 step 10000 eval -130.0 win 0% len 74 eps 0.00 loss 0.0073 396 sps
+eps0 step 15000 eval -49.7 win 6% len 90 eps 0.00 loss 0.0066 407 sps
+eps0 step 20000 eval 59.9 win 20% len 102 eps 0.00 loss 0.0144 395 sps
+eps0 step 25000 eval 91.5 win 36% len 88 eps 0.00 loss 0.0081 346 sps
+eps0 step 30000 eval 265.1 win 74% len 75 eps 0.00 loss 0.0751 323 sps
+eps0 step 35000 eval -85.2 win 16% len 45 eps 0.00 loss 0.0064 311 sps
+eps0 step 40000 eval -154.1 win 10% len 32 eps 0.00 loss 0.0052 304 sps
