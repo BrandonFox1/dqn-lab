@@ -30,7 +30,7 @@ pacdqn/
 
 ```bat
 pip install -r requirements.txt
-python -m pytest -q                      # 41 tests (1 skips without gymnasium), ~10 s on CPU
+python -m pytest -q                      # 42 tests (1 skips without gymnasium), ~10 s on CPU
 python -m pacdqn.train --maze small --ghosts 1 --steps 150000 --out runs/small
 python -m pacdqn.play  --run runs/small  # watch it in the terminal
 python -m pacdqn.play  --run runs/small --gif runs/small/play.gif
@@ -164,7 +164,9 @@ python -m pacdqn.arcade_train export --run runs/arcade --ckpt final.pt --dest ..
 
 `tests/test_arcade.py` checks the replay maths, the folded network, the bridge, and that an exported brain gives identical Q-values and plays identical games in Python and in JavaScript.
 
-**Results (`runs/arcade`, 30M decisions, 5.0 hours on 4 CPU cores).** Exam averages rose from 13,691 over the first 5M decisions to 25,330 over the last 5M, still climbing slowly. `best.pt` (the best 10-game exam, 29,695 at 21.25M) and the final checkpoint each played 50 selection games (seeds 3000–3049): 26,586 vs 28,321, so the final one ships as `final.pt`. Its final check on 50 new games (seeds 2000–2049), played exactly as the page runs it, scored 28,975 on average (median 29,290), cleared 5.02 levels per game, and its best game reached level 12. Random play scores 718. The full story is in `docs/HISTORY.md`.
+**Results (`runs/arcade`, 30M decisions, 5.0 hours on 4 CPU cores).** Exam averages rose from 13,691 over the first 5M decisions to 25,330 over the last 5M, still climbing slowly. `best.pt` (the best 10-game exam, 29,695 at 21.25M) and the final checkpoint each played 50 selection games (seeds 3000–3049): 26,586 vs 28,321, so the final one ships as `final.pt`. Its final check on 50 new games (seeds 2000–2049), played exactly as the page runs it, scored 28,975 on average (median 29,290), cleared 5.02 levels per game, and its best game reached level 12. Random play scores 718. 
+
+**Continued to 60M decisions** (`--resume runs/arcade/latest.pt --steps 60000000`, another 5.8 hours). Exam averages crept from 27,020 (30–35M) to 28,415 (55–60M). Four checkpoints played the 50 selection games: 30M 28,321, 39.75M 30,008, 57.5M 31,721, 60M 30,228. The 57.5M one now ships as `final.pt`. Its final check scored 29,654 on average and cleared 4.86 levels per game; its best game scored 48,000 on level 9. Over all 100 test games it averages 30,688, against 28,648 for the 30M brain: about 7% better for twice the training. The full story is in `docs/HISTORY.md`.
 
 ## Where to go next
 

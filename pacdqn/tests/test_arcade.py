@@ -127,5 +127,20 @@ def test_export_record_and_checkpoint_hours(tmp_path):
     assert json.loads((tmp_path / "curve.json").read_text()) == rec
 
 
+def test_resumed_run_adds_the_clock_segments(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    head = "steps,minutes,mean_score,median_score,max_score,mean_level,max_level,levels_cleared,ghosts_per_game,unfinished\n"
+    (run / "exam.csv").write_text(head + "250000,60.0,1,1,1,1,1,0,0,0\n500000,120.0,1,1,1,1,1,0,0,0\n"  # first segment
+                                  "750000,30.0,2,2,2,2,2,0,0,0\n")  # resumed: its clock starts again at 0
+    log = ["steps,updates,minutes,decisions_per_s,eps_mean,loss,q_mean,games,practice_score,practice_level",
+           "400000,1,100.0,1,0.1,0.1,1,1,10,1", "500000,1,120.0,1,0.1,0.1,1,1,10,1", "600000,1,15.0,1,0.1,0.1,1,1,10,1",
+           "750000,1,30.0,1,0.1,0.1,1,1,10,1"]
+    (run / "log.csv").write_text("\n".join(log) + "\n")
+    assert checkpoint_hours(run, 500000) == 2.0
+    assert checkpoint_hours(run, 750000) == 2.5  # 120 + 30 minutes
+    assert export_record(run, tmp_path / "c.json", random_score=1)["summary"]["hours"] == 2.5
+
+
 def test_bridge_path_exists():
     assert BRIDGE.exists()
