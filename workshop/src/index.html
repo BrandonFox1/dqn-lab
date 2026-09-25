@@ -13,7 +13,7 @@
 <body>
 <header class="hero">
   <h1 class="title">The DQN Workshop</h1>
-  <p class="lede">A Deep Q-Network learns by grading its own guesses. After every move it asks one question: how far off was my guess, compared with what actually happened plus my guess about what happens next? Then it nudges its weights to shrink that gap. The three stations below let you poke at that loop until it clicks.</p>
+  <p class="lede">A Deep Q-Network learns by grading its own guesses. After every move it asks one question: how far off was my guess, compared with what actually happened plus my guess about what happens next? Then it nudges its weights to shrink that gap. The four stations below let you poke at that loop until it clicks. On the first three you train small networks yourself; on the fourth, a much bigger one that learned offline plays the real arcade rules.</p>
 
   <figure class="equation" aria-label="The update rule: the guess q is nudged toward r plus gamma times v">
     <div class="eq-row">
@@ -33,6 +33,7 @@
   <button class="tab" role="tab" id="tab-bench" aria-controls="panel-bench" aria-selected="true">The Bench<span>one update, up close</span></button>
   <button class="tab" role="tab" id="tab-tank" aria-controls="panel-tank" aria-selected="false" tabindex="-1">Ripple Tank<span>truth flows backward</span></button>
   <button class="tab" role="tab" id="tab-arcade" aria-controls="panel-arcade" aria-selected="false" tabindex="-1">Arcade<span>train a whole agent</span></button>
+  <button class="tab" role="tab" id="tab-four" aria-controls="panel-four" aria-selected="false" tabindex="-1">Four ghosts<span>the real arcade rules</span></button>
 </nav>
 
 <main>
@@ -271,13 +272,94 @@
     <div class="exp-list" id="arc-experiments"></div>
   </div>
 </section>
+
+<!-- ============================================================ FOUR GHOSTS -->
+<section class="panel" id="panel-four" role="tabpanel" aria-labelledby="tab-four" hidden>
+  <div class="intro">
+    <h2>Four ghosts</h2>
+    <p>The whole 1980 arcade game: the real maze, four ghosts with their own personalities, scatter and chase waves, frightened mode, Cruise Elroy, fruit, lives, and levels that speed up. It is rebuilt rule by rule from the documents that describe the original (listed at the bottom of this station) and drawn in this workshop’s style. A DQN learned to play it with the same update as the Bench, only bigger: <span id="four-summary">a network of about half a million weights, trained for hours</span>.</p>
+  </div>
+  <div class="four-grid">
+    <div class="four-left">
+      <div class="screen four-screen">
+        <canvas id="four-canvas" aria-label="The arcade game"></canvas>
+        <div class="screen-status" id="four-status"></div>
+        <div class="chips screen-chips" id="four-layers" role="group" aria-label="Extra things to draw on the screen">
+          <button class="chip" data-layer="targets" aria-pressed="false">Ghost targets</button>
+          <button class="chip" data-layer="view" aria-pressed="false">What the brain sees</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="four-play">Pause</button>
+        <button class="btn" id="four-step">One move</button>
+        <button class="btn quiet" id="four-new">New game</button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-four-who">Who plays</span>
+        <div class="seg" id="four-who" role="group" aria-labelledby="lbl-four-who">
+          <button data-v="brain" aria-pressed="true">The brain</button>
+          <button data-v="you" aria-pressed="false">You</button>
+        </div>
+        <p class="note" id="four-who-note"></p>
+      </div>
+      <div class="pad four-pad" id="four-pad" role="group" aria-label="Joystick" hidden>
+        <button data-a="0" aria-label="Up" class="p-up"><svg viewBox="0 0 24 24"><path d="M12 5 4 16h16z"/></svg></button>
+        <button data-a="2" aria-label="Left" class="p-left"><svg viewBox="0 0 24 24"><path d="M5 12 16 4v16z"/></svg></button>
+        <button data-a="3" aria-label="Right" class="p-right"><svg viewBox="0 0 24 24"><path d="M19 12 8 4v16z"/></svg></button>
+        <button data-a="1" aria-label="Down" class="p-down"><svg viewBox="0 0 24 24"><path d="M12 19 4 8h16z"/></svg></button>
+      </div>
+      <div class="field">
+        <span class="field-name" id="lbl-four-speed">Speed</span>
+        <div class="seg" id="four-speed" role="group" aria-labelledby="lbl-four-speed">
+          <button data-v="1" aria-pressed="true">Arcade</button>
+          <button data-v="3" aria-pressed="false">3×</button>
+          <button data-v="10" aria-pressed="false">10×</button>
+          <button data-v="max" aria-pressed="false">Flat out</button>
+        </div>
+      </div>
+    </div>
+    <div class="four-right">
+      <dl class="stats" id="four-stats"></dl>
+      <div class="field">
+        <span class="mini-cap">What the <span class="hl hl-live">brain</span> thinks of each move <span id="four-q-when">at its latest decision</span></span>
+        <div class="qbars small" id="four-q"></div>
+        <p class="note">Each bar is its guess of all the reward still to come after that move, in training units: a dot is worth 0.32 and a lost life −2, and rewards further off count for less.</p>
+      </div>
+      <div class="field">
+        <span class="field-name">Ghost waves on this level</span>
+        <div class="waves" id="four-waves"></div>
+        <p class="note" id="four-waves-note">Ghosts alternate between scattering to their corners and chasing. Each switch makes them turn around. Frightened time pauses the clock.</p>
+      </div>
+      <div class="ghost-cards" id="four-ghosts"></div>
+    </div>
+  </div>
+
+  <div class="four-learn">
+    <h3>How the brain learned</h3>
+    <div class="chart-wrap tall"><canvas id="four-chart" aria-label="Exam scores while the brain trained"></canvas></div>
+    <p class="note">The line is the <span class="hl hl-live">exam</span>: every 250,000 decisions the brain played the same 10 games with no learning and no deliberate random moves, on the same sticky stick it trained with. Dots are practice games: the average of the last 100 finished while learning, random exploration moves included. Dashed line: random play.</p>
+    <p class="note">Practice runs far below the exam, and not because the brain plays worse there. Each of the 16 training games makes a different share of its moves at random, from 0.07% to 40%, and the most random games end soonest, so they fill almost half of the finished games. Replaying the finished brain that way, the 5 games with 5% or more random moves averaged 9,128 points; the other 11 averaged 24,662.</p>
+    <dl class="stats" id="four-train-stats"></dl>
+  </div>
+
+  <details class="drawer">
+    <summary>What the brain sees and how it was trained</summary>
+    <div class="four-doc" id="four-doc-brain"></div>
+  </details>
+  <details class="drawer">
+    <summary>The rules, and where each one comes from</summary>
+    <div class="four-doc" id="four-doc-rules"></div>
+  </details>
+</section>
 </main>
 
 <footer class="foot">
   <p>Built from scratch for this page: an 11,908-weight network with hand-written backpropagation, Adam, replay memory, a frozen target copy and Double DQN, all running in your browser. Same algorithm as the pacdqn project, smaller maze.</p>
+  <p>The Four ghosts brain was trained offline in PyTorch with the same ingredients (replay memory, a frozen copy, Double DQN) on the same arcade engine this page runs, and plays here through the page’s own network code. The rules come from public documents; the characters and artwork are original.</p>
 </footer>
 
 <script>/*__ENGINE__*/</script>
+<script>/*__ARCADE__*/</script>
 <script>/*__UI__*/</script>
 </body>
 </html>

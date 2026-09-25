@@ -925,13 +925,564 @@
     return { init, tick, onShow: render, get state() { return st; }, world, sweep, stepOnce, render };
   })();
 
+  // ============================================================== FOUR GHOSTS
+  // The arcade rules (Arcade, from arcade/arcade.js) with a brain trained offline in PyTorch on the very same engine.
+  const four = (() => {
+    const AR = Arcade;
+    const META = __ARCADE_META__;
+    const CURVE = __ARCADE_CURVE__;
+    const B64 = '__ARCADE_B64__';
+    const GCOL = ['#ff5a5f', '#ff9fd6', '#5ad7ef', '#ffb45a'];
+    const BLUE = '#3553e0', PALE = '#eef1ff';
+    const STICKY = 0.25; // the brain plays with the sticky stick it trained with
+    const GHOSTS = [
+      { name: 'Blinky', nick: 'the chaser', rule: 'Targets Pac-Man’s own tile. Late in each level he speeds up and keeps chasing even during scatter waves (Cruise Elroy).' },
+      { name: 'Pinky', nick: 'the ambusher', rule: 'Targets 4 tiles ahead of Pac-Man. When Pac-Man faces up it is 4 up and 4 left: a bug in the original code.' },
+      { name: 'Inky', nick: 'the fickle one', rule: 'Takes the tile 2 ahead of Pac-Man and doubles the arrow from Blinky to it, so where he goes depends on Blinky.' },
+      { name: 'Clyde', nick: 'the shy one', rule: 'Chases Pac-Man from 8 or more tiles away. Any closer and he heads back to his corner.' },
+    ];
+    const CORNER = ['top-right', 'top-left', 'bottom-right', 'bottom-left'];
+    const FRUIT_NAMES = { cherries: 'cherries', strawberry: 'a strawberry', peach: 'a peach', apple: 'an apple', grapes: 'grapes', galaxian: 'a ship', bell: 'a bell', key: 'a key' };
+    const st = {
+      who: 'brain', running: true, speed: 1, layers: { targets: false, view: false }, joy: null, deciding: false,
+      q: null, qAct: -1, coach: false, decisions: 0, gameDecisions: 0, games: 0, ghostsEaten: 0, overWait: 0, seed: 1001,
+      acc: 0, lastTs: 0, lastDom: 0, pacPhase: 0, lastPac: [0, 0], shown: false,
+    };
+    let env = null, game = null, net = null, qbars = null, cv = null, ctx = null, scale = 1, dpr = 1;
+    let walls = null, wallsFlash = null, pal = null;
+    const x255 = new Float32Array(AR.OBS.size);
+    const panel = () => $('#panel-four');
+    const secs = (frames) => `${(Math.max(0, frames) / 60).toFixed(1)} s`;
+    const fmt = (n) => Math.round(n).toLocaleString('en-US');
+
+    // ------------------------------------------------------------ brain
+    function loadNet() {
+      const bytes = E.b64ToBytes(B64);
+      let flat;
+      if (META.format === 'f16') { // half floats: 16 bits per weight keeps the page small
+        const h = new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+        flat = new Float32Array(h.length);
+        for (let i = 0; i < h.length; i++) {
+          const v = h[i], s = v & 0x8000 ? -1 : 1, e = (v >> 10) & 31, f = v & 1023;
+          flat[i] = e === 0 ? s * f * 5.960464477539063e-8 : e === 31 ? s * Infinity : s * (1 + f / 1024) * 2 ** (e - 15);
+        }
+      } else flat = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+      const m = new E.MLP(META.sizes, 1); m.loadFlat(flat);
+      return m;
+    }
+    // Same inputs the trainer stored: every number rounded to steps of 1/255.
+    function think() {
+      const o = env.observe();
+      for (let k = 0; k < o.length; k++) x255[k] = Math.round(o[k] * 255) / 255;
+      return net.forward(x255);
+    }
+    function decideNow() {
+      const q = think();
+      st.q = q; st.qAct = E.argmax(q); st.coach = false;
+      env.begin(st.qAct); st.deciding = true; st.decisions++; st.gameDecisions++;
+    }
+
+    // ------------------------------------------------------------ play
+    function newGame(seed = st.seed + 1) {
+      st.seed = seed; env.reset(seed);
+      st.deciding = false; st.gameDecisions = 0; st.ghostsEaten = 0; st.overWait = 0; st.games++;
+      st.q = null; st.qAct = -1; st.joy = null;
+      st.lastPac = [game.pac.x, game.pac.y];
+      renderDom(true);
+    }
+    // One arcade frame (1/60 s of game time).
+    function advance() {
+      if (game.over) { if (++st.overWait > 150 && st.who === 'brain') newGame(); return; }
+      if (st.who === 'brain') {
+        if (!st.deciding) decideNow();
+        const r = env.tick();
+        if (r) { st.deciding = false; st.ghostsEaten += r.ghosts; }
+      } else {
+        const p = game.pac, t0 = (p.x >> 3) + (p.y >> 3) * 28;
+        const ev = game.step(st.joy == null ? null : AR.ACTION_DIRS[st.joy]);
+        for (const e of ev) if (e.type === 'ghostEaten') st.ghostsEaten++;
+        if (!game.over && (p.x >> 3) + (p.y >> 3) * 28 !== t0) { const q = think(); st.q = q; st.qAct = E.argmax(q); st.coach = true; }
+      }
+    }
+    function oneMove() {
+      if (st.who === 'brain') { let n = 0; do advance(); while (st.deciding && ++n < 5000); }
+      else for (let k = 0; k < 8; k++) advance();
+      draw(); renderDom(true);
+    }
+    function tick(ts) {
+      if (!st.shown || panel().hidden) { st.lastTs = ts; return; }
+      const dt = Math.min(100, ts - (st.lastTs || ts)); st.lastTs = ts;
+      if (st.running) {
+        if (st.speed === 'max') {
+          const t0 = performance.now();
+          for (let n = 0; n < 40000; n++) { advance(); if (n % 64 === 63 && performance.now() - t0 > 9) break; }
+        } else {
+          st.acc += dt * 0.06 * st.speed;
+          let n = Math.min(Math.floor(st.acc), 2000); st.acc -= Math.floor(st.acc);
+          while (n-- > 0) advance();
+        }
+      }
+      draw();
+      if (ts - st.lastDom > 160) { st.lastDom = ts; renderDom(); } else renderStatus();
+    }
+
+    // ------------------------------------------------------------ drawing
+    function readPalette() {
+      pal = { screen: cssVar('--screen'), wall: cssVar('--wall'), wallHi: cssVar('--wall-hi'), pellet: cssVar('--pellet'), pac: cssVar('--pac'), font: cssVar('--font') };
+    }
+    function resize() {
+      if (!cv) return;
+      dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth || 300;
+      cv.width = Math.round(w * dpr); cv.height = Math.round(w * dpr * 288 / 224);
+      scale = cv.width / 224;
+      ctx = cv.getContext('2d');
+      readPalette();
+      walls = renderWalls(false); wallsFlash = renderWalls(true);
+    }
+    // The maze layout is the arcade's; the look is ours: merged wall blocks with a bright rim, like the Arcade station.
+    function renderWalls(flash) {
+      const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+      const k = c.getContext('2d');
+      k.fillStyle = pal.screen; k.fillRect(0, 0, c.width, c.height);
+      k.setTransform(scale, 0, 0, scale, 0, 0);
+      const isWall = (x, y) => x >= 0 && x < 28 && y >= 3 && y <= 33 && AR.cellAt(x, y) === AR.WALL;
+      for (const [inset, color] of [[1.4, flash ? '#f4f6ff' : pal.wallHi], [2.6, flash ? '#6b7fc8' : pal.wall]]) {
+        k.fillStyle = color;
+        for (let y = 3; y <= 33; y++) for (let x = 0; x < 28; x++) {
+          if (!isWall(x, y)) continue;
+          const X = x * 8, Y = y * 8, i = inset, s = 8 - 2 * i;
+          k.fillRect(X + i, Y + i, s, s);
+          if (isWall(x + 1, y)) k.fillRect(X + 8 - i, Y + i, 2 * i, s);
+          if (isWall(x, y + 1)) k.fillRect(X + i, Y + 8 - i, s, 2 * i);
+          if (isWall(x + 1, y) && isWall(x, y + 1) && isWall(x + 1, y + 1)) k.fillRect(X + 8 - i, Y + 8 - i, 2 * i, 2 * i);
+        }
+      }
+      k.fillStyle = '#ffb8de'; k.fillRect(13 * 8, 15 * 8 + 3, 16, 2); // the house door
+      return c;
+    }
+    function pacShape(k, x, y, r, dir, mouth, color) {
+      const rot = [-Math.PI / 2, Math.PI, Math.PI / 2, 0][dir];
+      k.fillStyle = color; k.beginPath();
+      if (mouth <= 0.01) k.arc(x, y, r, 0, 2 * Math.PI);
+      else { k.moveTo(x, y); k.arc(x, y, r, rot + mouth, rot + 2 * Math.PI - mouth); k.closePath(); }
+      k.fill();
+    }
+    function ghostShape(k, x, y, body, dir, look = 'normal') {
+      if (look !== 'eyes') {
+        k.fillStyle = body; k.beginPath();
+        k.arc(x, y - 0.8, 6.3, Math.PI, 0);
+        k.lineTo(x + 6.3, y + 4.6); k.arcTo(x + 6.3, y + 6.8, x + 4.1, y + 6.8, 2.2);
+        k.lineTo(x - 4.1, y + 6.8); k.arcTo(x - 6.3, y + 6.8, x - 6.3, y + 4.6, 2.2);
+        k.closePath(); k.fill();
+      }
+      if (look === 'blue' || look === 'flash') { // frightened face: two small eyes and a wavy mouth
+        const face = look === 'blue' ? '#ffd2c8' : '#ff5a5f';
+        k.fillStyle = face; k.fillRect(x - 3, y - 2.5, 2, 2); k.fillRect(x + 1, y - 2.5, 2, 2);
+        k.strokeStyle = face; k.lineWidth = 0.9; k.beginPath(); k.moveTo(x - 4, y + 3);
+        for (let i = 1; i <= 4; i++) k.lineTo(x - 4 + i * 2, y + (i % 2 ? 1.8 : 3));
+        k.stroke();
+        return;
+      }
+      const dx = AR.DX[dir] * 1.2, dy = AR.DY[dir] * 1.3;
+      for (const ex of [-2.5, 2.5]) {
+        k.fillStyle = '#fff'; k.beginPath(); k.ellipse(x + ex + dx * 0.4, y - 1.4 + dy * 0.4, 1.9, 2.3, 0, 0, 2 * Math.PI); k.fill();
+        k.fillStyle = '#233a99'; k.beginPath(); k.arc(x + ex + dx, y - 1.4 + dy, 1.1, 0, 2 * Math.PI); k.fill();
+      }
+    }
+    // Generic fruit icons (our own drawings, not the arcade's sprites).
+    function fruitIcon(k, name, x, y, s = 1) {
+      k.save(); k.translate(x, y); k.scale(s, s);
+      const circ = (cx, cy, r, c) => { k.fillStyle = c; k.beginPath(); k.arc(cx, cy, r, 0, 2 * Math.PI); k.fill(); };
+      const stem = (x1, y1, x2, y2, c = '#7bd67f') => { k.strokeStyle = c; k.lineWidth = 1; k.beginPath(); k.moveTo(x1, y1); k.quadraticCurveTo((x1 + x2) / 2 + 1, y1 - 2, x2, y2); k.stroke(); };
+      switch (name) {
+        case 'cherries': stem(-2.4, 2, 2, -5.5); stem(2.6, 2.4, 2, -5.5); circ(-2.4, 2.8, 2.6, '#ff4f6d'); circ(2.8, 3.2, 2.6, '#ff4f6d'); break;
+        case 'strawberry':
+          k.fillStyle = '#ff4760'; k.beginPath(); k.moveTo(-5, -2); k.quadraticCurveTo(0, -5, 5, -2); k.quadraticCurveTo(4, 4, 0, 6); k.quadraticCurveTo(-4, 4, -5, -2); k.fill();
+          k.fillStyle = '#ffe0a0'; for (const [a, b] of [[-2, 0], [1.5, -0.5], [-0.5, 2.5], [2, 2.6]]) k.fillRect(a, b, 0.9, 0.9);
+          k.fillStyle = '#6fdc7a'; k.fillRect(-2.5, -4.6, 5, 1.3); break;
+        case 'peach': circ(0, 1, 5, '#ffa64d'); k.fillStyle = '#6fdc7a'; k.beginPath(); k.ellipse(1.8, -4, 2.4, 1.1, -0.5, 0, 2 * Math.PI); k.fill(); break;
+        case 'apple': circ(0, 1.2, 5, '#ff5a52'); stem(0, -3, 1.2, -6, '#b77b44'); k.fillStyle = '#6fdc7a'; k.beginPath(); k.ellipse(2.7, -4.6, 1.8, 0.9, -0.4, 0, 2 * Math.PI); k.fill(); break;
+        case 'grapes': for (const [a, b] of [[-2.6, -1], [0, -1.4], [2.6, -1], [-1.3, 1.4], [1.3, 1.4], [0, 3.8]]) circ(a, b, 1.9, '#a86bff'); stem(0, -3, 1, -6); break;
+        case 'galaxian': // a generic little ship
+          k.fillStyle = '#ffd23f'; k.beginPath(); k.moveTo(0, -5.5); k.lineTo(2, 1); k.lineTo(-2, 1); k.closePath(); k.fill();
+          k.fillStyle = '#5ad7ef'; k.beginPath(); k.moveTo(-5.5, 3.5); k.lineTo(-1.5, -0.5); k.lineTo(-1.5, 3); k.closePath(); k.fill();
+          k.beginPath(); k.moveTo(5.5, 3.5); k.lineTo(1.5, -0.5); k.lineTo(1.5, 3); k.closePath(); k.fill();
+          k.fillStyle = '#ff5a5f'; k.fillRect(-1, 1, 2, 3.5); break;
+        case 'bell':
+          k.fillStyle = '#ffd23f'; k.beginPath(); k.moveTo(-5, 4); k.quadraticCurveTo(-4.5, -5.5, 0, -5.5); k.quadraticCurveTo(4.5, -5.5, 5, 4); k.closePath(); k.fill();
+          circ(0, 5, 1.4, '#eef1ff'); break;
+        default: // key
+          k.strokeStyle = '#8fd4ff'; k.lineWidth = 1.6; k.beginPath(); k.arc(0, -3, 2.4, 0, 2 * Math.PI); k.stroke();
+          k.beginPath(); k.moveTo(0, -0.6); k.lineTo(0, 6); k.moveTo(0, 3.5); k.lineTo(2.2, 3.5); k.moveTo(0, 5.6); k.lineTo(1.8, 5.6); k.stroke();
+      }
+      k.restore();
+    }
+    function draw() {
+      if (!ctx || !walls) return;
+      const g = game, k = ctx, ph = g.phase;
+      const cleared = ph === 'levelClear' && g.freeze < 180 && ((g.freeze >> 4) & 1);
+      k.setTransform(1, 0, 0, 1, 0, 0); k.drawImage(cleared ? wallsFlash : walls, 0, 0);
+      k.setTransform(scale, 0, 0, scale, 0, 0);
+      // dots and energizers
+      k.fillStyle = pal.pellet;
+      const blinkOff = ph === 'play' && (g.frame >> 3) & 1;
+      for (let i = 3 * 28; i < 34 * 28; i++) {
+        const d = g.dots[i]; if (!d) continue;
+        const x = (i % 28) * 8 + 3.5, y = ((i / 28) | 0) * 8 + 4.5;
+        if (d === 1) k.fillRect(x - 1, y - 1, 2, 2);
+        else if (!blinkOff) { k.beginPath(); k.arc(x, y, 3.3, 0, 2 * Math.PI); k.fill(); }
+      }
+      if (g.fruit) fruitIcon(k, g.spec.bonusName, 111.5, 164.5);
+      if (st.layers.view) drawView();
+      if (st.layers.targets && ph === 'play') drawTargets();
+      // ghosts
+      const dying = ph === 'dying' ? 210 - g.freeze : -1;
+      const hideGhosts = (dying >= 60 && g.opts.pauses) || ph === 'levelClear' || g.over;
+      if (!hideGhosts) for (const h of g.ghosts) {
+        const x = h.x + 0.5, y = h.y + 0.5, eaten = h.state === AR.EYES || h.state === AR.ENTERING;
+        if (ph === 'ghostEaten' && g.lastEaten && g.lastEaten.ghost === h.id) continue;
+        let look = 'normal', body = GCOL[h.id];
+        if (eaten) look = 'eyes';
+        else if (h.frightened) { const flashOn = g.flashing && ((g.frightTimer / 14) | 0) % 2 === 0; look = flashOn ? 'flash' : 'blue'; body = flashOn ? PALE : BLUE; }
+        ghostShape(k, x, y, body, h.state === AR.ACTIVE ? h.turnDir : h.dir, look);
+      }
+      // Pac-Man
+      const p = g.pac;
+      const moved = Math.abs(p.x - st.lastPac[0]) + Math.abs(p.y - st.lastPac[1]);
+      if (moved < 20) st.pacPhase += moved;
+      st.lastPac = [p.x, p.y];
+      if (ph === 'ghostEaten' && g.lastEaten) {
+        k.fillStyle = '#5ad7ef'; k.font = `800 7px ${pal.font}`; k.textAlign = 'center'; k.textBaseline = 'middle';
+        k.fillText(String(g.lastEaten.points), g.lastEaten.x + 0.5, g.lastEaten.y + 0.5);
+      } else if (!(g.over && g.lives <= 0 && ph !== 'dying')) {
+        let mouth = ph === 'ready' ? 0 : 0.08 + 0.42 * Math.abs(Math.sin(st.pacPhase * Math.PI / 7));
+        if (dying >= 60) mouth = Math.min(Math.PI, 0.35 + ((dying - 60) / 150) * Math.PI);
+        if (mouth < Math.PI - 0.05) pacShape(k, p.x + 0.5, p.y + 0.5, 6.5, p.dir, mouth, pal.pac);
+      }
+      // text on the maze
+      k.textAlign = 'center'; k.textBaseline = 'middle';
+      if (ph === 'ready') { k.fillStyle = '#ffd23f'; k.font = `800 italic 8px ${pal.font}`; k.fillText('Ready!', 111.5, 20 * 8 + 4.5); }
+      if (g.over) { k.fillStyle = '#ff5a5f'; k.font = `800 8px ${pal.font}`; k.fillText('Game over', 111.5, 20 * 8 + 4.5); }
+      // HUD: score and level on top, lives and fruit at the bottom
+      k.textBaseline = 'alphabetic'; k.textAlign = 'left'; k.fillStyle = '#aab6d3'; k.font = `700 6px ${pal.font}`;
+      k.fillText('SCORE', 8, 9); k.textAlign = 'right'; k.fillText('LEVEL', 216, 9);
+      k.fillStyle = '#e8ecf6'; k.font = `800 8px ${pal.font}`;
+      k.textAlign = 'left'; k.fillText(fmt(g.score), 8, 19); k.textAlign = 'right'; k.fillText(String(g.level), 216, 19);
+      for (let i = 0; i < Math.min(5, g.lives - (g.over ? 0 : 1)); i++) pacShape(k, 16 + i * 13, 280, 4.6, AR.LEFT, 0.55, pal.pac);
+      for (let j = 0; j < 7 && g.level - j >= 1; j++) fruitIcon(k, AR.levelSpec(g.level - j).bonusName, 208 - j * 13, 280, 0.8);
+    }
+    function drawView() {
+      const k = ctx, p = game.pac, x = ((p.x >> 3) - AR.WIN / 2 + 0.5) * 8, y = ((p.y >> 3) - AR.WIN / 2 + 0.5) * 8, s = AR.WIN * 8;
+      k.save(); k.fillStyle = 'rgba(122,167,255,.08)'; k.fillRect(x, y, s, s);
+      k.strokeStyle = '#7aa7ff'; k.lineWidth = 1; k.setLineDash([3, 2]); k.strokeRect(x, y, s, s); k.setLineDash([]);
+      k.fillStyle = '#7aa7ff'; k.font = `700 5.5px ${pal.font}`; k.textBaseline = 'bottom';
+      const label = 'the brain’s 15 × 15 view', lw = k.measureText(label).width;
+      k.textAlign = 'left'; k.fillText(label, clamp(x + 2, 2, 222 - lw), y > 30 ? y - 1.5 : y + s + 7.5);
+      k.restore();
+    }
+    function drawTargets() {
+      const k = ctx, g = game, p = g.pac, px = p.x >> 3, py = p.y >> 3;
+      const center = (t) => [t[0] * 8 + 3.5, t[1] * 8 + 4.5];
+      k.save(); k.lineWidth = 1;
+      for (const h of g.ghosts) {
+        if ((h.state !== AR.ACTIVE && h.state !== AR.EYES) || h.frightened) continue;
+        const t = g.targetOf(h); if (!t) continue;
+        const col = GCOL[h.id], chase = !g.scatter || (h.id === AR.BLINKY && g.elroy() > 0);
+        let [tx, ty] = center(t);
+        const cx = clamp(tx, 3, 221), cy = clamp(ty, 3, 285), off = cx !== tx || cy !== ty;
+        if (h.id === AR.INKY && chase && h.state === AR.ACTIVE) { // Blinky -> pivot, doubled
+          const [ox, oy] = AR.ahead(p.dir, 2), b = g.ghosts[AR.BLINKY], pv = center([px + ox, py + oy]);
+          k.strokeStyle = GCOL[AR.BLINKY]; k.globalAlpha = 0.6; k.beginPath(); k.moveTo((b.x >> 3) * 8 + 3.5, (b.y >> 3) * 8 + 4.5); k.lineTo(pv[0], pv[1]); k.stroke();
+          k.fillStyle = col; k.globalAlpha = 0.9; k.beginPath(); k.arc(pv[0], pv[1], 1.6, 0, 2 * Math.PI); k.fill();
+        }
+        if (h.id === AR.CLYDE && chase && h.state === AR.ACTIVE) {
+          k.strokeStyle = col; k.globalAlpha = 0.28; k.beginPath(); k.arc(px * 8 + 3.5, py * 8 + 4.5, 64, 0, 2 * Math.PI); k.stroke();
+        }
+        k.globalAlpha = 0.8; k.strokeStyle = col; k.setLineDash([2.5, 2]);
+        k.beginPath(); k.moveTo(h.x + 0.5, h.y + 0.5); k.lineTo(cx, cy); k.stroke(); k.setLineDash([]);
+        k.globalAlpha = 1; k.lineWidth = 1.2;
+        k.strokeRect(cx - 3.5, cy - 3.5, 7, 7);
+        k.beginPath(); k.moveTo(cx - 2, cy - 2); k.lineTo(cx + 2, cy + 2); k.moveTo(cx + 2, cy - 2); k.lineTo(cx - 2, cy + 2); k.stroke();
+        if (off) { // target beyond the screen: an arrow at the edge
+          const a = Math.atan2(ty - cy, tx - cx); k.fillStyle = col; k.beginPath();
+          k.moveTo(cx + Math.cos(a) * 7, cy + Math.sin(a) * 7); k.lineTo(cx + Math.cos(a + 2.5) * 4, cy + Math.sin(a + 2.5) * 4); k.lineTo(cx + Math.cos(a - 2.5) * 4, cy + Math.sin(a - 2.5) * 4); k.fill();
+        }
+        k.lineWidth = 1;
+      }
+      k.restore();
+    }
+
+    // ------------------------------------------------------------ side panel
+    function modeLine() {
+      const g = game;
+      if (g.over) return `Game over: ${fmt(g.score)} points`;
+      if (g.phase === 'ready') return 'Get ready…';
+      if (g.phase === 'levelClear') return `Level ${g.level} cleared`;
+      if (g.frightTimer > 0) return `Frightened, ${secs(g.frightTimer)} left${g.flashing ? ' (flashing)' : ''}`;
+      const w = g.scatter ? 'Scatter' : 'Chase';
+      return g.modeTimer === Infinity ? `${w} until the level ends` : `${w}, ${secs(g.modeTimer)} left`;
+    }
+    function ghostNow(h) {
+      const g = game, sp = g.spec;
+      if (h.state === AR.HOUSE) {
+        if (g.globalActive) {
+          const need = [0, 7, 17, 32][h.id];
+          return `In the house. Since the lost life it waits for the shared dot count to reach ${need} (now ${g.globalCounter}), or for ${secs(sp.dotTimer - g.dotTimer)} with no dot eaten.`;
+        }
+        if (g._preferredWaiting() !== h) return 'In the house, waiting for its turn to count dots.';
+        return `In the house, counting dots: ${h.dotCounter} of ${sp.dotLimits[h.id]}. Or it leaves after ${secs(sp.dotTimer - g.dotTimer)} more with no dot eaten.`;
+      }
+      if (h.state === AR.LEAVING) return h.frightened ? 'Leaving the house, frightened.' : 'Leaving the house.';
+      if (h.state === AR.EYES || h.state === AR.ENTERING) return 'Eaten. Its eyes are hurrying back to the house.';
+      if (h.frightened) return g.flashing ? 'Frightened and flashing: about to recover.' : 'Frightened: slower, turning at random.';
+      const t = g.targetOf(h), e = g.elroy();
+      if (h.id === AR.BLINKY && e > 0) return `Cruise Elroy ${e}: faster, and chasing even in scatter waves. Target (${t[0]}, ${t[1]}).`;
+      if (g.scatter) return `Scatter: heading for the ${CORNER[h.id]} corner.`;
+      if (h.id === AR.CLYDE) {
+        const d = Math.hypot((h.x >> 3) - (g.pac.x >> 3), (h.y >> 3) - (g.pac.y >> 3));
+        return d >= 8 ? `Chase: ${d.toFixed(1)} tiles from Pac-Man, so going after him.` : `Chase, but only ${d.toFixed(1)} tiles from Pac-Man, so backing off to his corner.`;
+      }
+      const off = t[0] < 0 || t[0] > 27 || t[1] < 0 || t[1] > 35 ? ', off the screen' : '';
+      return `Chase: target tile (${t[0]}, ${t[1]})${off}.`;
+    }
+    function renderStatus() {
+      const g = game, s = `<span>${modeLine()}</span><span>${g.elroy() ? `Blinky: Cruise Elroy ${g.elroy()}` : `Level ${g.level}`}</span>`;
+      const box = $('#four-status'); if (box._s !== s) { box._s = s; box.innerHTML = s; }
+    }
+    function renderDom(force) {
+      if (!st.shown) return;
+      const g = game;
+      renderStatus();
+      const dl = $('#four-stats');
+      const rows = [
+        ['Score', fmt(g.score)], ['Level', String(g.level)], ['Lives left', String(g.lives)], ['Dots left', `${g.dotsLeft} of 244`],
+        [st.who === 'brain' ? 'Brain decisions this game' : 'Playing', st.who === 'brain' ? fmt(st.gameDecisions) : 'you'],
+        ['Ghosts eaten this game', String(st.ghostsEaten)],
+        ['Fruit', g.fruit ? `${FRUIT_NAMES[g.spec.bonusName]}, ${fmt(g.fruit)} points` : `${FRUIT_NAMES[g.spec.bonusName]} after ${g.dotsEaten < 70 ? 70 : 170} dots`],
+        ['Game', `seed ${st.seed}`],
+      ];
+      if (!dl._dd) { dl.textContent = ''; dl._dd = rows.map(([k]) => { const d = el('div', '', dl); el('dt', '', d, k); return el('dd', '', d); }); dl._dt = $$('dt', dl); }
+      rows.forEach(([k, v], i) => { if (dl._dt[i].textContent !== k) dl._dt[i].textContent = k; if (dl._dd[i].textContent !== v) dl._dd[i].textContent = v; });
+      qbars.render(st.q || [0, 0, 0, 0], { hi: st.qAct, cls: 'live' });
+      $('#four-q-when').textContent = st.who === 'brain' ? 'at its latest decision' : 'right here, if it were playing';
+      renderWaves(force);
+      const cards = $('#four-ghosts');
+      if (!cards._now) {
+        cards.textContent = '';
+        cards._now = g.ghosts.map((h) => {
+          const c = el('div', 'gcard', cards); c.style.setProperty('--c', GCOL[h.id]);
+          el('div', 'sw', c);
+          html(el('h4', '', c), `${GHOSTS[h.id].name}<small>${GHOSTS[h.id].nick}</small>`);
+          el('p', 'rule', c, GHOSTS[h.id].rule);
+          return el('p', 'now', c);
+        });
+      }
+      g.ghosts.forEach((h, i) => { const s = ghostNow(h); if (cards._now[i].textContent !== s) cards._now[i].textContent = s; });
+    }
+    function renderWaves(force) {
+      const root = $('#four-waves'), g = game, modes = g.spec.modes;
+      const key = `${g.level > 4 ? 5 : g.level > 1 ? 2 : 1}`;
+      if (root._key !== key || force) {
+        root._key = key; root.textContent = '';
+        root._w = modes.concat([Infinity]).map((f, i) => {
+          const w = el('div', 'wave' + (i % 2 ? ' chase' : ''), root); w._fill = el('i', 'fill', w);
+          const s = f === Infinity ? 'forever' : f < 60 ? '1/60 s' : `${fmt(f / 60)} s`;
+          el('span', '', w, `${i % 2 ? 'Chase' : 'Scatter'} ${s}`);
+          return w;
+        });
+      }
+      root._w.forEach((w, i) => {
+        const now = i === g.modeIndex, done = i < g.modeIndex;
+        w.className = 'wave' + (i % 2 ? ' chase' : '') + (now ? ' now' : '') + (done ? ' done' : '');
+        const f = now && modes[i] ? 1 - g.modeTimer / modes[i] : done ? 1 : 0;
+        w._fill.style.width = `${Math.round(clamp(f, 0, 1) * 100)}%`;
+      });
+    }
+
+    // ------------------------------------------------------------ training record
+    function drawChart() {
+      const c = $('#four-chart');
+      if (!c || panel().hidden) return;
+      const { ctx: k, w, h } = fitCanvas(c);
+      const ink = cssVar('--ink'), ink3 = cssVar('--ink-3'), live = cssVar('--live');
+      const ex = CURVE.exams || [], pr = CURVE.practice || [], base = CURVE.random || 0;
+      k.font = '11px ' + cssVar('--font');
+      if (!ex.length) { k.fillStyle = ink3; k.textAlign = 'center'; k.fillText('No training record in this build.', w / 2, h / 2); return; }
+      const L = 48, R = 12, T = 12, B = 26;
+      const x1 = Math.max(...ex.map((e) => e[0]), ...pr.map((p) => p[0]));
+      let hi = Math.max(...ex.map((e) => e[1]), ...pr.map((p) => p[1]), base) * 1.08;
+      const X = (s) => L + (s / x1) * (w - L - R), Y = (v) => T + ((hi - v) / hi) * (h - T - B);
+      k.lineWidth = 1; k.fillStyle = ink3; k.strokeStyle = ink3; k.textAlign = 'right'; k.textBaseline = 'middle';
+      for (const t of niceTicks(0, hi, 4)) { k.globalAlpha = 0.3; k.beginPath(); k.moveTo(L, Y(t)); k.lineTo(w - R, Y(t)); k.stroke(); k.globalAlpha = 1; k.fillText(t >= 1000 ? `${+(t / 1000).toFixed(1)}k` : String(t), L - 6, Y(t)); }
+      const endLabel = `${x1 >= 1e6 ? +(x1 / 1e6).toFixed(1) + 'M' : fmt(x1)} decisions`, endW = k.measureText(endLabel).width;
+      k.textAlign = 'center'; k.textBaseline = 'top';
+      for (const t of niceTicks(0, x1, 4)) { // skip ticks whose label would run into the end label
+        const txt = t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? `${+(t / 1000).toFixed(0)}k` : String(t);
+        if (X(t) + k.measureText(txt).width / 2 < w - R - endW - 8) k.fillText(txt, X(t), h - B + 6);
+      }
+      k.textAlign = 'right'; k.fillText(endLabel, w - R, h - B + 6);
+      k.setLineDash([5, 4]); k.beginPath(); k.moveTo(L, Y(base)); k.lineTo(w - R, Y(base)); k.stroke(); k.setLineDash([]);
+      k.fillStyle = ink; k.globalAlpha = 0.25;
+      for (const [s, v] of pr) { k.beginPath(); k.arc(X(s), Y(v), 1.6, 0, 6.3); k.fill(); }
+      k.globalAlpha = 1;
+      k.strokeStyle = live; k.fillStyle = live; k.lineWidth = 2.5; k.beginPath();
+      ex.forEach(([s, v], i) => (i ? k.lineTo(X(s), Y(v)) : k.moveTo(X(s), Y(v)))); k.stroke();
+      if (ex.length < 80) for (const [s, v] of ex) { k.beginPath(); k.arc(X(s), Y(v), 2.4, 0, 6.3); k.fill(); }
+      // Labels: the exam tag, the first-cleared line, and the shipped checkpoint, which dodges the other two.
+      const last = ex[ex.length - 1], placed = [];
+      const label = (text, x, y, align, base, color, bold) => {
+        k.font = (bold ? '600 ' : '') + '11px ' + cssVar('--font');
+        const tw = k.measureText(text).width, x0 = align === 'right' ? x - tw : x, y0 = base === 'top' ? y : y - 12;
+        return { text, x, y, align, base, color, bold, box: [x0 - 2, y0 - 1, x0 + tw + 2, y0 + 13] };
+      };
+      const overlap = (a, b) => Math.max(0, Math.min(a.box[2], b.box[2]) - Math.max(a.box[0], b.box[0])) * Math.max(0, Math.min(a.box[3], b.box[3]) - Math.max(a.box[1], b.box[1]));
+      const outside = (a) => a.box[0] < L || a.box[2] > w || a.box[1] < 0 || a.box[3] > h - B + 2;
+      const cost = (a) => (outside(a) ? 1e9 : 0) + placed.reduce((c, b) => c + overlap(a, b), 0);
+      const best = (tries) => tries.reduce((m, a) => (cost(a) < cost(m) ? a : m)); // first candidate wins ties
+      const put = (a) => {
+        placed.push(a); k.fillStyle = a.color; k.font = (a.bold ? '600 ' : '') + '11px ' + cssVar('--font');
+        k.textAlign = a.align; k.textBaseline = a.base; haloText(k, a.text, a.x, a.y);
+      };
+      const first = ex.find((e) => e[2] > 1.05);
+      if (first) {
+        k.strokeStyle = cssVar('--frozen'); k.lineWidth = 1; k.setLineDash([3, 3]);
+        k.beginPath(); k.moveTo(X(first[0]), T); k.lineTo(X(first[0]), h - B); k.stroke(); k.setLineDash([]);
+        const right = X(first[0]) > w * 0.6;
+        put(label('first level cleared in an exam', X(first[0]) + (right ? -4 : 4), T, right ? 'right' : 'left', 'top', cssVar('--frozen'), false));
+      }
+      put(label('random play', w - R - 4, Y(base) - 3, 'right', 'bottom', ink3, false));
+      put(label('exam', Math.min(X(last[0]), w - R) - 4, Y(last[1]) - 4, 'right', 'bottom', live, true));
+      const pick = META.steps && ex.find((e) => e[0] === META.steps);
+      if (pick) { // the checkpoint this page plays
+        k.strokeStyle = live; k.lineWidth = 2; k.fillStyle = cssVar('--sheet-2');
+        k.beginPath(); k.arc(X(pick[0]), Y(pick[1]), 5, 0, 6.3); k.fill(); k.stroke();
+        const px = X(pick[0]), py = Y(pick[1]), txt = 'the brain on this page', tries = [];
+        for (const dy of [-6, 7, 20, -19]) for (const side of px > w * 0.6 ? [-1, 1] : [1, -1])
+          tries.push(label(txt, px + side * 8, py + dy, side < 0 ? 'right' : 'left', dy < 0 ? 'bottom' : 'top', live, true));
+        put(best(tries));
+      }
+    }
+    function renderRecord() {
+      const s = CURVE.summary || {};
+      const weights = META.weights || 0;
+      const hrs = (x) => `${x.toFixed(1)} hours`;
+      const hours = META.hours ? hrs(META.hours) : s.hours ? hrs(s.hours) : 'several hours';
+      $('#four-summary').textContent = `${fmt(weights)} weights (the Arcade station’s brain has 11,908), trained on ${fmt(META.steps || 0)} decisions over ${hours} on 4 CPU cores`;
+      const dl = $('#four-train-stats'); dl.textContent = '';
+      const f = s.final, millions = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : fmt(n));
+      const rows = [['Decisions trained', fmt(META.steps || 0)], ['Training time', hours]];
+      if (f) rows.push([`Final check (${f.games} new games)`, `${fmt(f.mean_score)} points`], ['Levels cleared per game', (f.mean_level - 1).toFixed(2)],
+        [`Best game in the check (level ${f.max_level})`, `${fmt(f.max_score)} points`], ['Ghosts eaten per game', f.ghosts_per_game.toFixed(1)], ['Network weights', fmt(weights)]);
+      else rows.push(['Best exam (10 games)', META.exam ? `${fmt(META.exam.mean_score)} points` : '—'], ['Network weights', fmt(weights)]);
+      if (s.decisions > (META.steps || 0)) rows.push([`Whole run${s.hours ? ` (${hrs(s.hours)})` : ''}`, `${millions(s.decisions)} decisions`]);
+      rows.push(['Random play', `${fmt(CURVE.random || 0)} points`]);
+      for (const [a, b] of rows) { const d = el('div', '', dl); el('dt', '', d, a); el('dd', '', d, b); }
+    }
+    function renderDocs() {
+      const o = AR.OBS;
+      html($('#four-doc-brain'), `
+        <h4>What the brain sees: ${fmt(o.size)} numbers per decision</h4>
+        <ul>
+          <li><b>A 15 × 15 window centered on Pac-Man</b> (${fmt(o.window)} numbers): 7 layers marking walls, dots, energizers, ghosts, the square each ghost is about to enter, frightened ghosts, and fruit. Turn on <b>What the brain sees</b> above the screen to see the window.</li>
+          <li><b>A compass for each move</b> (${o.paths} numbers): if Pac-Man goes this way, how many steps along the maze to the nearest dot, energizer and fruit, and to each ghost, dangerous or frightened.</li>
+          <li><b>${o.global} facts about the game</b>: which way Pac-Man faces, the frightened and wave timers, each ghost’s state and where it is relative to Pac-Man, Cruise Elroy, the level, dots left, lives.</li>
+          <li><b>A coarse map of the remaining dots</b> (${o.dotmap} blocks of 4 × 4 tiles), so it can find the last few.</li>
+        </ul>
+        <h4>How it decides and learns</h4>
+        <ul>
+          <li>It picks a move every time Pac-Man enters a new tile: the move whose bar is tallest. The stick is held that way until the next tile, so turns are taken as early as the rules allow.</li>
+          <li>Its network is ${META.sizes.join(' → ')}, ${fmt(META.weights || 0)} weights, trained in PyTorch on the same JavaScript engine this page runs. The page runs it with the workshop’s own hand-written network code, and a test checks that both give identical Q-values and play identical games.</li>
+          <li>Rewards: the square root of the arcade points, divided by 10 (a dot 0.32, an energizer 0.71, ghosts 1.4 to 4, fruit 1 to 7.1), and −2 for losing a life. A lost life also ends the target, with no future added, like the game-over case on the Bench.</li>
+          <li>The same Double DQN target as the Bench, looking 3 moves ahead instead of 1: r₁ + γr₂ + γ²r₃ + γ³·v, with γ = 0.99 per move. There is a replay memory of about a million moves and a frozen copy refreshed every 2,000 updates.</li>
+          <li>Exploration: 16 games trained at once, each with its own random-move chance from 40% down to under 0.1%.</li>
+          <li>Sticky stick, in training and exams: each frame there is a 25% chance the stick stays where it was, so a new direction sometimes lands a frame or two late (the recipe from Machado et al., 2018). The ghosts are deterministic, so without this every game from the start would be nearly the same, and a memorized route could pass for skill.</li>
+        </ul>`);
+      html($('#four-doc-rules'), `
+        <p>Brandon chose <b>documents only</b>, so there is no ROM data anywhere: no graphics, sounds or code bytes from the arcade machine. The rules come from <b>The Pac-Man Dossier</b> by Jamey Pittman, which the author checked against the ROM disassembly. A few coordinates were cross-checked against pacman.c by Andre Weissflog. The characters, fruit icons and wall style are this workshop’s own drawings. 51 rule-by-rule tests keep the engine honest.</p>
+        <ul>
+          <li><b>Maze</b>: 28 × 31 tiles, 240 dots and 4 energizers, the side tunnel, the house with its door, and the two red zones above the house and Pac-Man’s start where ghosts may not turn up. <span class="src">Dossier ch. 2–3</span></li>
+          <li><b>Speed</b>: level 1 Pac-Man 80%, ghosts 75%, tunnel 40%, up to 100%/95% from level 5. Pac-Man stops 1 frame per dot (3 per energizer), which is why ghosts catch up while he eats. <span class="src">Table A.1</span></li>
+          <li><b>Cornering</b>: Pac-Man can turn up to 4 pixels before a corner and cut it diagonally. Ghosts can’t. <span class="src">ch. 2</span></li>
+          <li><b>Ghost pathfinding</b>: decide one tile ahead, never reverse by choice, take the exit closest in a straight line to the target, and break ties up, left, down, right. <span class="src">ch. 3</span></li>
+          <li><b>Waves</b>: scatter 7 s, chase 20 s, scatter 7, chase 20, scatter 5, chase 20, scatter 5, then chase for good on level 1. Every switch reverses the ghosts. <span class="src">ch. 2</span></li>
+          <li><b>Frightened</b>: 6 s on level 1, shrinking to none by level 19. Ghosts worth 200, 400, 800, 1600. <span class="src">Table A.1</span></li>
+          <li><b>Ghost house</b>: dot counters (Inky after 30, Clyde after 60 more on level 1), a shared counter after a lost life (7, 17, 32), and a 4-second no-dot timer. <span class="src">ch. 2</span></li>
+          <li><b>Cruise Elroy</b>: Blinky speeds up at 20 and 10 dots left on level 1 (more on later levels) and stops scattering. <span class="src">ch. 4</span></li>
+          <li><b>Collisions</b> are by tile, checked once a frame, so Pac-Man and a ghost that swap tiles in the same frame pass right through each other, as in the arcade. <span class="src">ch. 3</span></li>
+        </ul>
+        <h4>Where the documents are silent</h4>
+        <table><tr><th>Detail</th><th>What this version does</th></tr>
+          <tr><td>Frame-by-frame speed patterns</td><td>exact average speeds, spread evenly</td></tr>
+          <tr><td>Frightened ghosts’ random turns</td><td>a seeded random generator, reset every level and every life like the original (which reads its own ROM bytes instead)</td></tr>
+          <tr><td>Speed of eyes and of ghosts in the house</td><td>1.5 and 0.5 pixels per frame</td></tr>
+          <tr><td>Level 256, the split screen</td><td>not emulated: the game ends after level 255</td></tr>
+        </table>`);
+    }
+
+    // ------------------------------------------------------------ controls
+    function setWho(v) {
+      st.who = v; setSeg($('#four-who'), v);
+      $('#four-pad').hidden = v !== 'you';
+      cv.style.touchAction = v === 'you' ? 'none' : '';
+      $('#four-who-note').textContent = v === 'you'
+        ? 'Arrow keys or WASD, swipe on the screen, or use the pad. The stick stays where you last pushed it, like a real joystick. Push early to cut corners.'
+        : 'At every tile the brain scores the four moves and takes the tallest bar. It plays with the sticky stick it trained with: each frame there is a 25% chance a new direction waits one more frame. So no two games are the same.';
+      st.deciding = false; st.joy = null;
+      renderDom(true);
+    }
+    function setRunning(on) { st.running = on; $('#four-play').textContent = on ? 'Pause' : 'Play'; }
+    function init() {
+      cv = $('#four-canvas'); qbars = new QBars($('#four-q'));
+      env = new AR.ArcadeEnv({ seed: st.seed, pauses: true, sticky: STICKY }); game = env.game; env.reset(st.seed);
+      $('#four-play').addEventListener('click', () => setRunning(!st.running));
+      $('#four-step').addEventListener('click', () => { setRunning(false); oneMove(); });
+      $('#four-new').addEventListener('click', () => newGame());
+      bindSeg($('#four-who'), setWho);
+      bindSeg($('#four-speed'), (v) => { st.speed = v === 'max' ? 'max' : +v; });
+      $$('#four-layers .chip').forEach((b) => b.addEventListener('click', () => {
+        const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on));
+        st.layers[b.dataset.layer] = on; draw();
+      }));
+      const KEYS = { ArrowUp: 0, KeyW: 0, ArrowDown: 1, KeyS: 1, ArrowLeft: 2, KeyA: 2, ArrowRight: 3, KeyD: 3 };
+      document.addEventListener('keydown', (e) => {
+        if (panel().hidden || st.who !== 'you' || !(e.code in KEYS)) return;
+        if (e.target.closest && e.target.closest('input, select, textarea')) return;
+        e.preventDefault(); st.joy = KEYS[e.code];
+      });
+      $$('#four-pad button').forEach((b) => b.addEventListener('pointerdown', (e) => { e.preventDefault(); st.joy = +b.dataset.a; }));
+      let sw = null;
+      cv.addEventListener('pointerdown', (e) => { if (st.who === 'you') sw = [e.clientX, e.clientY]; });
+      cv.addEventListener('pointermove', (e) => {
+        if (!sw) return;
+        const dx = e.clientX - sw[0], dy = e.clientY - sw[1];
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 14) return;
+        st.joy = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0);
+        sw = [e.clientX, e.clientY];
+      });
+      for (const t of ['pointerup', 'pointercancel', 'pointerleave']) cv.addEventListener(t, () => { sw = null; });
+      setWho('brain');
+      renderDocs(); renderRecord();
+    }
+    function onShow() {
+      if (!net) net = loadNet();
+      st.shown = true;
+      resize(); draw(); renderDom(true); drawChart();
+    }
+    function redraw() { if (!st.shown || panel().hidden) return; resize(); draw(); drawChart(); }
+    // for tests: n whole brain decisions, synchronously
+    function runDecisions(n) { if (!net) net = loadNet(); const was = st.who; if (was !== 'brain') setWho('brain'); for (let i = 0; i < n && !game.over; i++) { let g = 0; do advance(); while (st.deciding && ++g < 5000); } }
+    return { init, tick, onShow, redraw, drawChart, newGame, setWho, runDecisions, advance, draw, get env() { return env; }, get game() { return game; }, get state() { return st; }, get net() { return net; } };
+  })();
+
   // ===================================================================== TABS
-  const TABS = { 'tab-bench': bench, 'tab-tank': tank, 'tab-arcade': arcade };
+  const TABS = { 'tab-bench': bench, 'tab-tank': tank, 'tab-arcade': arcade, 'tab-four': four };
   function selectTab(id) {
     $$('.tab').forEach((t) => {
       const on = t.id === id;
       t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1;
       $('#' + t.getAttribute('aria-controls')).hidden = !on;
+      if (on && t.parentElement.scrollWidth > t.parentElement.clientWidth) t.parentElement.scrollTo({ left: t.offsetLeft - 18, behavior: 'auto' });
     });
     TABS[id].onShow();
   }
@@ -947,21 +1498,22 @@
     });
   }
 
-  function redrawCharts() { if (!$('#panel-bench').hidden) bench.render(); arcade.drawCurve(); }
+  function redrawCharts() { if (!$('#panel-bench').hidden) bench.render(); arcade.drawCurve(); four.redraw(); }
 
   function boot() {
     initTabs();
     arcade.init();
     bench.init();
     tank.init();
+    four.init();
     requestAnimationFrame(() => requestAnimationFrame(() => $('.equation').classList.add('eq-drawn')));
-    const loop = (ts) => { tank.tick(ts); arcade.tick(ts); requestAnimationFrame(loop); };
+    const loop = (ts) => { tank.tick(ts); arcade.tick(ts); four.tick(ts); requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
     let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawCharts, 120); });
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawCharts);
     new MutationObserver(redrawCharts).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCharts);
-    window.__workshop = { bench, tank, arcade, selectTab };
+    window.__workshop = { bench, tank, arcade, four, selectTab };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
