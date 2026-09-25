@@ -40,5 +40,5 @@ python -m pacdqn.arcade_train train --out runs/arcade --steps 30000000
 python -m pacdqn.arcade_train export --run runs/arcade --ckpt final.pt --dest ../workshop/brains/arcade
 cd ../workshop && npm run build
 ```
-Shipped Four ghosts brain: 30M decisions, 5.0 hours on 4 CPU cores. Over 50 new games (seeds 2000–2049) it scored 28,975 on average and cleared 5.02 levels per game; its best game reached level 12 with 57,930 points. Random play averages 718.
+Shipped Four ghosts brain: the 57.5M-decision checkpoint (10.3 hours on 4 CPU cores) of a 60M-decision run, chosen on 50 selection games. Over 50 new games (seeds 2000–2049) it scored 29,654 on average and cleared 4.86 levels per game; its best game scored 48,000 on level 9. Random play averages 718.
 It is stored as half floats (16-bit), which halves the page size. The export measures how many of the brain's moves that changes, and its 50-game final check plays the exported brain in JavaScript exactly as this page does.

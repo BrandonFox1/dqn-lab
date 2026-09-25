@@ -1373,9 +1373,11 @@
       const f = s.final, millions = (n) => (n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : fmt(n));
       const rows = [['Decisions trained', fmt(META.steps || 0)], ['Training time', hours]];
       if (f) rows.push([`Final check (${f.games} new games)`, `${fmt(f.mean_score)} points`], ['Levels cleared per game', (f.mean_level - 1).toFixed(2)],
-        [`Best game in the check (level ${f.max_level})`, `${fmt(f.max_score)} points`], ['Ghosts eaten per game', f.ghosts_per_game.toFixed(1)], ['Network weights', fmt(weights)]);
+        [`Best game in the check (level ${f.max_level})`, `${fmt(f.max_score)} points`], ['Ghosts eaten per game', f.ghosts_per_game.toFixed(1)]);
+      const partRun = s.decisions > (META.steps || 0); // shipped brain is mid-run: the run row replaces the weights row (keeps the grid even)
+      if (f && !partRun) rows.push(['Network weights', fmt(weights)]);
       else rows.push(['Best exam (10 games)', META.exam ? `${fmt(META.exam.mean_score)} points` : '—'], ['Network weights', fmt(weights)]);
-      if (s.decisions > (META.steps || 0)) rows.push([`Whole run${s.hours ? ` (${hrs(s.hours)})` : ''}`, `${millions(s.decisions)} decisions`]);
+      if (partRun) rows.push([`Whole run${s.hours ? ` (${hrs(s.hours)})` : ''}`, `${millions(s.decisions)} decisions`]);
       rows.push(['Random play', `${fmt(CURVE.random || 0)} points`]);
       for (const [a, b] of rows) { const d = el('div', '', dl); el('dt', '', d, a); el('dd', '', d, b); }
     }

@@ -350,12 +350,26 @@ def random_baseline(games: int = 100, seed_base: int = 5000) -> float:
     return float(score.mean())
 
 
+def total_minutes(rows: list[dict]) -> list[float]:
+    """Training minutes since the run began, for each log row. A resumed run restarts its clock at 0, so each
+    segment is added onto the time the earlier segments had reached."""
+    out, offset, last = [], 0.0, 0.0
+    for r in rows:
+        m = float(r["minutes"])
+        if m < last:  # the clock restarted: a resumed segment
+            offset += last
+        last = m
+        out.append(offset + m)
+    return out
+
+
 def checkpoint_hours(run: Path, steps: int) -> float | None:
     """Training time (hours) when the checkpoint at `steps` was saved, from the exam log."""
     with open(run / "exam.csv") as f:
-        for r in csv.DictReader(f):
-            if int(r["steps"]) == steps:
-                return round(float(r["minutes"]) / 60, 2)
+        rows = list(csv.DictReader(f))
+    for r, m in zip(rows, total_minutes(rows)):
+        if int(r["steps"]) == steps:
+            return round(m / 60, 2)
     return None
 
 
@@ -364,10 +378,11 @@ def export_record(run: Path, dest: Path, final: dict | None = None, random_score
     with open(run / "exam.csv") as f:
         exams = [[int(r["steps"]), float(r["mean_score"]), float(r["mean_level"])] for r in csv.DictReader(f)]
     with open(run / "log.csv") as f:
-        rows = [r for r in csv.DictReader(f) if r["practice_score"]]
+        log = list(csv.DictReader(f))
+    minutes = total_minutes(log)[-1] if log else 0.0
+    rows = [r for r in log if r["practice_score"]]
     stride = max(1, len(rows) // 400)
     practice = [[int(r["steps"]), round(float(r["practice_score"]))] for r in rows[::stride]]
-    minutes = float(rows[-1]["minutes"]) if rows else 0.0
     rec = {"exams": exams, "practice": practice, "random": round(random_score if random_score is not None else random_baseline()),
            "summary": {"hours": round(minutes / 60, 2), "decisions": exams[-1][0] if exams else 0, **({"final": final} if final else {})}}
     dest.write_text(json.dumps(rec, separators=(",", ":")))

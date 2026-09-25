@@ -13,6 +13,7 @@ Items 1–7 below happened in one claude.ai conversation on 2026-09-23; its verb
 8. **Move to Claude Code**: this repo. First session: all checks green (pytest 33 pass + 1 gymnasium skip, 19 engine tests, build byte-identical to the shipped page, 23/23 QA).
 9. **GitHub Pages**: `.github/workflows/workshop.yml` checks every workshop PR (tests, build, dist freshness, browser QA) and publishes the page to https://brandonfox1.github.io/dqn-lab/ on every merge to `main`, so updates no longer need a claude.ai chat.
 10. **Four ghosts** (2026-09-25): "I want to do #4 (the arcade-faithful version), as accurate as possible." Brandon first offered the original ROMs for the ghost logic, mechanics and graphics, then chose **documents only** (below). Built `arcade/` (the 1980 rules, frame by frame, every rule sourced and tested), a PyTorch trainer that plays that same JavaScript engine through a small bridge, a trained brain, and the Workshop's fourth station. After 5 hours of training on 4 CPU cores, the brain clears 5 levels per game on average: 28,975 points over 50 new games, best game level 12, against 718 for random play. Claude Code also republished the claude.ai copy of the page directly with its Artifact tool, first as a preview mid-training.
+11. **Four ghosts to 60M decisions** (same day, evening): "keep training the brain to 60M decisions". The run resumed from the 30M checkpoint, optimizer included, for another 5.8 hours. A checkpoint from 57.5M decisions won a new selection round and ships: 29,654 on its final check. Mid-run, at Brandon's request, the claude.ai page carried the 39.75M brain, which measured a statistical tie with 30M. The same day's first Pages deploy was blocked by a race in `qa.js`, fixed in PR #5.
 
 ## pacdqn (Python)
 - **Environment**: original Pac-Man-style maze (no Namco assets). Mazes `small` 11×13 and `medium` 18×19. 8-channel grid observation: walls, pellets, power pellets, player, dangerous ghosts, frightened ghosts, ghosts' previous cells, power-timer plane. Ghosts take the BFS-shortest step with probability "aggression" (0.9, 0.7, 0.5, 0.3), can't reverse mid-corridor, flee at half speed after a power pellet. Rewards in points: pellet +10, power +50, ghost +200, clear +500, death −500, step −1; trained on points × 0.01. Death stops bootstrapping, the step limit does not.
@@ -195,14 +196,14 @@ The trainer keeps `best.pt`, the checkpoint with the best 10-game exam: 29,695 a
 | best exam (21.25M) | 26,586 ± 1,063 | 26,525 | 42,310 | 4.80 | 29.6 |
 | final (30M) | **28,321** ± 1,285 | 27,235 | 45,630 | 4.78 | 30.9 |
 
-The best exam's 29,695 shrank to 26,586 on new games. The final checkpoint scored higher; the gap is about one standard error, so the two are close. It ships as `runs/arcade/final.pt` (weights only).
+The best exam's 29,695 shrank to 26,586 on new games. The final checkpoint scored higher; the gap is about one standard error, so the two are close. It shipped as `runs/arcade/final.pt` (weights only) until the run was continued to 60M decisions (below).
 
 ### The final check: 50 games that played no part in the choice
 Seeds 2000–2049, sticky stick on. The first row is the exported half-float brain played in JavaScript, exactly as the page runs it:
 
 | | mean | median | best game | levels cleared per game | ghosts per game |
 |---|---|---|---|---|---|
-| **the page's brain** (half floats, JavaScript) | **28,975** | 29,290 | 57,930 (level 12) | 5.02 | 31.9 |
+| **the 30M brain as the page plays it** (half floats, JavaScript) | **28,975** | 29,290 | 57,930 (level 12) | 5.02 | 31.9 |
 | full precision (PyTorch), same games | 28,172 | 27,100 | 42,570 (level 9) | 4.84 | 30.9 |
 | random play (100 games) | 718 | | | | |
 
@@ -222,7 +223,44 @@ So practice runs low for two reasons:
 - random moves are expensive (40% random averaged 5,165 points; 0.1% averaged 28,660);
 - the most random games end soonest, so they make up far more than their share of the finished games that the practice dots average.
 
-The brain itself plays at exam level. The page's note under the chart says this, using the 5%-or-more split: 9,128 against 24,662.
+The brain itself plays at exam level. The page's note under the chart makes the same point with the shipped brain's numbers, using the 5%-or-more split.
+
+### Continuing to 60M decisions
+`--resume runs/arcade/latest.pt --steps 60000000` picked up the network, Adam's state and the step counter. The replay memory refilled from new games, and the exploration rates were already at their final values. The resumed segment's `minutes` clock restarts at 0, so the export adds the segments together (`total_minutes`, with a test). Exam averages for each 5M decisions:
+
+| decisions | 30–35M | 35–40M | 40–45M | 45–50M | 50–55M | 55–60M |
+|---|---|---|---|---|---|---|
+| exam mean (20 exams each) | 27,020 | 26,400 | 26,962 | 27,334 | 28,748 | 28,415 |
+| mean level reached | 5.6 | 5.5 | 5.6 | 5.5 | 5.8 | 5.8 |
+
+In total: 60M decisions in 10.8 hours and 39,634 training games. Four checkpoints played the same 50 selection games (seeds 3000–3049):
+
+| checkpoint | mean ± standard error | median | best game | boards cleared per game | ghosts per game |
+|---|---|---|---|---|---|
+| 30M (shipped until now) | 28,321 ± 1,285 | 27,235 | 45,630 | 4.78 | 30.9 |
+| 39.75M (best exam at the time) | 30,008 ± 1,309 | 28,915 | 62,120 | 5.16 | 33.0 |
+| **57.5M (best exam of the run)** | **31,721** ± 1,419 | 30,490 | 59,620 | 5.38 | 34.4 |
+| 60M (end of training) | 30,228 ± 1,169 | 30,695 | 45,040 | 5.14 | 33.1 |
+
+The 57.5M checkpoint now ships as `final.pt`. Its final check on the separate 50 games (seeds 2000–2049), played as the page plays it:
+
+| same 50 games | mean | median | best game | levels cleared per game | ghosts per game |
+|---|---|---|---|---|---|
+| 30M brain | 28,975 | 29,290 | 57,930 (level 12) | 5.02 | 31.9 |
+| **57.5M brain** | **29,654** | 27,900 | 48,000 (level 9) | 4.86 | 32.4 |
+
+- **The gain is real but modest.** Over all 100 test games, the 57.5M brain averages 30,688 against 28,648, and it's ahead on both sets. It earns its extra points mostly by eating more ghosts; levels cleared stayed about the same.
+- **Doubling the training bought about 7%.** Most of the curve's rise came in the first 5M decisions.
+- **The 39.75M interim.** Brandon asked to see the newer brain before the run finished. The 39.75M checkpoint won its selection round (30,008 vs 28,321) but lost the final check (28,244 vs 28,975): a tie over 100 games (29,126 vs 28,648). It went up on the claude.ai page anyway at his request, with its own numbers on the page.
+
+Practice vs exam for the shipped 57.5M brain, measured the same way as before (16 games with learning off, 320,000 decisions, 179 finished games):
+
+| random-move rate | games of the 16 | finished games | share of all finished | mean score |
+|---|---|---|---|---|
+| 11% to 40% | 4 | 72 | 40% | 8,286 |
+| 1% to 7% | 5 | 53 | 30% | 19,782 |
+| under 1% | 7 | 54 | 30% | 30,599 |
+| all | 16 | 179 | | 18,421 |
 
 ### Shipping the brain
 - **Half floats**: the export stores each weight in 16 bits instead of 32. That turns 2.8 MB of base64 into 1.4 MB, and the page from 3 MB into 1.66 MB. The export measures what that costs on 4,000 real decisions: none of the first brain's moves changed (largest Q-value difference 0.001); one mid-run checkpoint changed 8 of 4,000, and the shipped one none (largest Q-value difference 0.011). Any change is a near-tie: a move can flip only when its two best options are within twice that difference.
