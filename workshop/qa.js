@@ -95,8 +95,8 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   await page.click('#arc-train');
   const s0 = await page.evaluate(() => window.__workshop.arcade.agent.steps);
   await sleep(8000);
-  const s1 = await page.evaluate(() => window.__workshop.arcade.agent.steps);
-  const exams = await page.evaluate(() => window.__workshop.arcade.state.exams.map((e) => e.step));
+  // read steps and exams in one call: Turbo keeps training between separate calls, so a 2,500 mark could fall in between
+  const [s1, exams] = await page.evaluate(() => [window.__workshop.arcade.agent.steps, window.__workshop.arcade.state.exams.map((e) => e.step)]);
   check('arcade: exams run on schedule', exams[0] === 0 && exams.length === 1 + Math.floor(s1 / 2500), `exams at ${exams.join(',')}`);
   check('arcade: turbo trains', s1 > s0 + 500, `${((s1 - s0) / 8).toFixed(0)} steps/s in headless phone emulation`);
   await page.screenshot({ path: 'shots/m_arcade_training.png', fullPage: true });
