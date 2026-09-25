@@ -1,0 +1,27 @@
+{
+  "envs": 16,
+  "steps": 30000000,
+  "hidden": [
+    256,
+    256
+  ],
+  "lr": 0.0001,
+  "gamma": 0.99,
+  "n_step": 3,
+  "batch": 128,
+  "replay_ratio": 8.0,
+  "buffer": 1000000,
+  "learning_starts": 50000,
+  "target_update": 2000,
+  "eps_base": 0.4,
+  "eps_alpha": 7.0,
+  "eps_warmup": 250000,
+  "death_penalty": -2.0,
+  "grad_clip": 10.0,
+  "exam_every": 250000,
+  "exam_games": 10,
+  "exam_sticky": 0.25,
+  "exam_max_decisions": 30000,
+  "seed": 1,
+  "threads": 3
+}

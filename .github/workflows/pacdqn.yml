@@ -1,0 +1,45 @@
+# pacdqn: the PyTorch agents, including the arcade-rules trainer. Its tests drive the JavaScript engine through
+# arcade/bridge.js, so they also prove that Python and the Workshop page see and play the same game.
+name: pacdqn
+
+on:
+  push:
+    branches: [main]
+    paths: ['pacdqn/**', 'arcade/**', '.github/workflows/pacdqn.yml']
+  pull_request:
+    paths: ['pacdqn/**', 'arcade/**', '.github/workflows/pacdqn.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pacdqn-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python tests and arcade rules
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pacdqn
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install (CPU-only torch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "numpy>=1.24" "pytest>=7" "Pillow>=9"
+
+      - name: pytest
+        run: python -m pytest -q
+
+      - name: Arcade rule tests
+        run: node ../arcade/test_arcade.js

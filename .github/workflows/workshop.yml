@@ -8,9 +8,9 @@ name: Workshop
 on:
   push:
     branches: [main]
-    paths: ['workshop/**', '.github/workflows/workshop.yml']
+    paths: ['workshop/**', 'arcade/**', '.github/workflows/workshop.yml']
   pull_request:
-    paths: ['workshop/**', '.github/workflows/workshop.yml']
+    paths: ['workshop/**', 'arcade/**', '.github/workflows/workshop.yml']
   workflow_dispatch:
 
 permissions:
@@ -36,6 +36,9 @@ jobs:
       - name: Engine tests (19)
         run: npm test
 
+      - name: Arcade rule tests (51)
+        run: node ../arcade/test_arcade.js
+
       - name: Build
         run: npm run build
 
@@ -51,7 +54,7 @@ jobs:
       - name: Install QA browser
         run: npm install --no-audit --no-fund
 
-      - name: Browser QA (23 checks)
+      - name: Browser QA (29 checks)
         run: npm run qa
 
       - name: Exam schedule check

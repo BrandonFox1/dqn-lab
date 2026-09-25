@@ -26,7 +26,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
 
   await page.screenshot({ path: 'shots/m_top.png' });
   // horizontal overflow check
-  const overflow = await page.evaluate(() => ['tab-bench', 'tab-tank', 'tab-arcade'].map((t) => { window.__workshop.selectTab(t); return document.documentElement.scrollWidth - document.documentElement.clientWidth; }));
+  const overflow = await page.evaluate(() => ['tab-bench', 'tab-tank', 'tab-arcade', 'tab-four'].map((t) => { window.__workshop.selectTab(t); return document.documentElement.scrollWidth - document.documentElement.clientWidth; }));
   await page.evaluate(() => window.__workshop.selectTab('tab-bench'));
   check('no horizontal scroll on phone, any tab', overflow.every((o) => o <= 0), `overflow ${overflow.join('/')}px`);
 
@@ -124,6 +124,50 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   check('arcade: send to bench switches tab and brain', await page.evaluate(() => !document.querySelector('#panel-bench').hidden && window.__workshop.bench.state.brainKind === 'arcade'));
   await page.close();
 
+  // ---- Four ghosts (the arcade rules)
+  {
+    const A = require('../arcade/arcade.js'), E = require('./engine.js'), { loadBrain, quantize } = require('../arcade/eval_brain.js');
+    const { net } = loadBrain(path.resolve('brains/arcade'));
+    const ref = new A.ArcadeEnv({ seed: 4242, sticky: 0.25 }); ref.reset(4242); const x = new Float32Array(A.OBS.size);
+    for (let i = 0; i < 300 && !ref.game.over; i++) ref.step(E.argmax(net.forward(quantize(ref.observe(), x))));
+    const want = { score: ref.game.score, lives: ref.game.lives, level: ref.game.level, dotsLeft: ref.game.dotsLeft };
+    const f = await open(mobile, false);
+    await f.click('#tab-four'); await sleep(1200);
+    const px = await f.evaluate(() => {
+      const c = document.querySelector('#four-canvas'), k = c.getContext('2d'), d = k.getImageData(0, 0, c.width, c.height).data, seen = new Set();
+      for (let i = 0; i < d.length; i += 97 * 4) seen.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+      return { colors: seen.size, sizes: window.__workshop.four.net.sizes, w: c.width };
+    });
+    check('four: the tab opens, the brain loads and the game is drawn', px.colors > 8 && px.sizes.join() === '1768,256,256,4', `${px.colors} colors, brain ${px.sizes.join('-')}`);
+    const got = await f.evaluate(() => { const F = window.__workshop.four; F.newGame(4242); F.runDecisions(300); const g = F.game; return { score: g.score, lives: g.lives, level: g.level, dotsLeft: g.dotsLeft }; });
+    check('four: the page brain plays move for move like the Node reference', JSON.stringify(got) === JSON.stringify(want), `page ${JSON.stringify(got)} vs node ${JSON.stringify(want)}`);
+    await f.$eval('#four-who button[data-v="you"]', (e) => e.click());
+    const steer = await f.evaluate(() => {
+      const F = window.__workshop.four; F.newGame(7);
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowUp', bubbles: true }));
+      for (let i = 0; i < 400; i++) F.advance();
+      return { joy: F.state.joy, dir: F.game.pac.dir, padShown: !document.querySelector('#four-pad').hidden, y: F.game.pac.y };
+    });
+    check('four: you can play: the arrow key latches up and Pac-Man turns up at the first opening', steer.joy === 0 && steer.dir === A.UP && steer.padShown && steer.y < 212, JSON.stringify(steer));
+    await f.$eval('#four-who button[data-v="brain"]', (e) => e.click());
+    for (const l of ['targets', 'view']) await f.$eval(`#four-layers .chip[data-layer="${l}"]`, (e) => e.click());
+    await f.$eval('#four-speed button[data-v="max"]', (e) => e.click());
+    await f.$eval('#four-play', (e) => { if (e.textContent === 'Play') e.click(); });
+    const d0 = await f.evaluate(() => window.__workshop.four.state.decisions); await sleep(2000);
+    const d1 = await f.evaluate(() => window.__workshop.four.state.decisions);
+    check('four: overlays on, flat-out speed runs the brain quickly', d1 - d0 > 150, `${d1 - d0} decisions in 2 s`);
+    await f.evaluate(() => document.querySelector('#four-canvas').scrollIntoView({ block: 'start' })); await sleep(300);
+    await f.screenshot({ path: 'shots/m_four_game.png' });
+    const side = await f.evaluate(() => ({ cards: document.querySelectorAll('#four-ghosts .gcard').length, waves: document.querySelectorAll('#four-waves .wave').length,
+      nowTexts: [...document.querySelectorAll('#four-ghosts .now')].every((p) => p.textContent.length > 5), stats: document.querySelectorAll('#four-stats dd').length }));
+    check('four: ghost cards, waves and stats fill in', side.cards === 4 && side.waves === 8 && side.nowTexts && side.stats === 8, JSON.stringify(side));
+    await f.evaluate(() => document.querySelector('.four-learn').scrollIntoView({ block: 'start' })); await sleep(300);
+    const chart = await f.evaluate(() => { const c = document.querySelector('#four-chart'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0; for (let i = 3; i < d.length; i += 4 * 7) if (d[i] > 0) ink++; return { ink, rows: document.querySelectorAll('#four-train-stats dd').length }; });
+    check('four: the training record is drawn', chart.ink > 200 && chart.rows >= 5, JSON.stringify(chart));
+    await f.screenshot({ path: 'shots/m_four_learn.png' });
+    await f.close();
+  }
+
   // ---- dark + desktop
   const d = await open({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: false }, true);
   await d.screenshot({ path: 'shots/m_dark_top.png' });
@@ -137,6 +181,9 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   await w.click('#tab-arcade'); await sleep(200);
   await w.click('#arc-load'); await w.click('#arc-speed button[data-v="turbo"]'); await w.click('#arc-train'); await sleep(5000);
   await w.screenshot({ path: 'shots/d_arcade.png' });
+  await w.click('#tab-four'); await sleep(1500);
+  await w.evaluate(() => document.querySelector('#panel-four').scrollIntoView()); await sleep(200);
+  await w.screenshot({ path: 'shots/d_four.png' });
   await w.close();
   const wd = await open({ width: 1280, height: 900, deviceScaleFactor: 1 }, true);
   await wd.click('#tab-tank'); await sleep(100);

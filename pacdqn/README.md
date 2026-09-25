@@ -18,8 +18,11 @@ pacdqn/
     agent.py    DQNAgent — ε-greedy, Double DQN target, Huber loss, hard target sync
     train.py    CLI training loop, CSV logs, eval, best/latest checkpoints
     play.py     watch a checkpoint in the terminal or record a GIF
-  tests/        pytest suite (env rules, replay, model, agent math, CLI smoke)
+    arcade_env.py    many arcade-rules games at once, run by ../arcade/arcade.js through Node
+    arcade_train.py  the Four ghosts trainer: dueling Double DQN, 3-step returns, exams, export
+  tests/        pytest suite (env rules, replay, model, agent math, CLI smoke, arcade trainer + JS parity)
   runs/small/   a finished demo run (config, logs, checkpoints, GIF)
+  runs/arcade/  the Four ghosts run (config, logs, exams, weights-only best.pt)
   run.bat       Windows: install deps, run tests, train, record GIF
 ```
 
@@ -27,7 +30,7 @@ pacdqn/
 
 ```bat
 pip install -r requirements.txt
-python -m pytest -q                      # 31 tests, ~10 s on CPU
+python -m pytest -q                      # 41 tests (1 skips without gymnasium), ~10 s on CPU
 python -m pacdqn.train --maze small --ghosts 1 --steps 150000 --out runs/small
 python -m pacdqn.play  --run runs/small  # watch it in the terminal
 python -m pacdqn.play  --run runs/small --gif runs/small/play.gif
@@ -136,14 +139,41 @@ the network and step counter; the replay buffer is refilled on restart.
 Curriculum that works: `small` + 1 ghost first (150k steps), then `medium` + 2
 ghosts with `--eps-decay-steps 300000 --steps 1000000 --buffer-size 200000`.
 
+## The arcade-rules version (the Workshop's Four ghosts)
+
+`arcade_train.py` trains on the real 1980 rules: the 28×31 maze, four ghost personalities, waves, frightened mode, Cruise Elroy, fruit and level speeds. The game itself is `../arcade/arcade.js`, the same file the Workshop page runs. Python starts `node ../arcade/bridge.js` and trades small binary messages with it, so training and the page can't disagree about the rules or about what the network sees. You need Node 18+ on the PATH.
+
+```bash
+python -m pacdqn.arcade_train train --out runs/arcade --steps 30000000   # ~1,600 decisions/s on 4 CPU cores
+python -m pacdqn.arcade_train exam --run runs/arcade --games 50          # sticky-move exam on fresh seeds
+python -m pacdqn.arcade_train export --run runs/arcade --ckpt final.pt --dest ../workshop/brains/arcade
+```
+
+| piece | choice |
+|---|---|
+| decisions | one per tile Pac-Man enters; the stick is held until the next tile |
+| observation | 1,768 numbers: 15×15 window × 7 layers, per-move maze distances, 45 game facts, a coarse dot map (see `../arcade/README.md`) |
+| network | MLP 1768 → 256 → 256 with a dueling head, folded into a plain 256 → 4 layer for export |
+| targets | Double DQN with 3-step returns, γ = 0.99, frozen copy refreshed every 2,000 updates |
+| replay | about a million decisions, stored time-major (each state stored once) |
+| exploration | 16 games at once, each with its own random-move chance from 40% down to 0.07% (Ape-X) |
+| rewards | sqrt(points) / 10, and −2 for a lost life; a lost life ends the target |
+| sticky stick | in training and exams, each frame has a 25% chance the stick stays where it was, so a new direction can land a frame or two late (Machado et al., 2018); this stops a memorized route from passing for skill |
+| exams | every 250,000 decisions: 10 fixed games (seeds 1000–1009), greedy, sticky stick on, no learning |
+| export | half floats in the Workshop brain format. The export measures how often that changes a move, then plays a final check of 50 new games (seeds 2000–2049) with the exported brain in JavaScript, exactly as the page runs it, and the same games at full precision |
+
+`tests/test_arcade.py` checks the replay maths, the folded network, the bridge, and that an exported brain gives identical Q-values and plays identical games in Python and in JavaScript.
+
+**Results (`runs/arcade`, 30M decisions, 5.0 hours on 4 CPU cores).** Exam averages rose from 13,691 over the first 5M decisions to 25,330 over the last 5M, still climbing slowly. `best.pt` (the best 10-game exam, 29,695 at 21.25M) and the final checkpoint each played 50 selection games (seeds 3000–3049): 26,586 vs 28,321, so the final one ships as `final.pt`. Its final check on 50 new games (seeds 2000–2049), played exactly as the page runs it, scored 28,975 on average (median 29,290), cleared 5.02 levels per game, and its best game reached level 12. Random play scores 718. The full story is in `docs/HISTORY.md`.
+
 ## Where to go next
 
 1. **Prioritized replay** — sample transitions with large TD error more often. `replay.py` is 60 lines; swap the uniform `sample` for a sum-tree.
-2. **n-step returns** — bootstrap from `r₁ + γr₂ + γ²r₃ + γ³Q(s₄)` instead of one step. Faster credit assignment for the delayed death penalty.
+2. **n-step returns** — bootstrap from `r₁ + γr₂ + γ²r₃ + γ³Q(s₄)` instead of one step. Faster credit assignment for the delayed death penalty. (`arcade_train.py` already does this with n = 3; its `VecReplay` is a working example.)
 3. **Noisy nets / distributional (C51)** — the rest of the Rainbow paper.
 4. **Real Atari Ms. Pac-Man** — `pip install "gymnasium[atari]"` (ale-py bundles the ROMs). Wrap frames to `(4, 84, 84)` with `gymnasium.wrappers.AtariPreprocessing` + `FrameStackObservation`; `QNetwork` already accepts any `(C, H, W)`, so the agent is unchanged. Expect ~10M frames on a GPU for good play.
 5. **Compare to a System-1 model** — feed `env.render()` to Jev each step and ask "which direction?" — no training, instant policy, no improvement. Same harness, opposite philosophy.
 
 ## Reference
 
-Mnih et al. 2015 (DQN) · van Hasselt et al. 2016 (Double DQN) · Wang et al. 2016 (Dueling) · Hessel et al. 2018 (Rainbow).
+Mnih et al. 2015 (DQN) · van Hasselt et al. 2016 (Double DQN) · Wang et al. 2016 (Dueling) · Hessel et al. 2018 (Rainbow) · Horgan et al. 2018 (Ape-X, the per-game exploration rates) · Machado et al. 2018 (sticky actions for honest Atari evaluation) · Pittman, *The Pac-Man Dossier* (the arcade rules).
