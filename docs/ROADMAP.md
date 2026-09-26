@@ -13,8 +13,8 @@
 - Exams with sticky actions for honest evaluation (the arcade trainer already does this; port its per-frame version to `train.py`).
 
 ## Four ghosts (the arcade-rules version, built 2026-09-25)
-Done: the rules engine (`arcade/`), the trainer (`pacdqn/pacdqn/arcade_train.py`), the brain (33,720 points and 6.06 levels cleared per game over 50 new games) and the Workshop station. Next, roughly in order of value:
-- **A proper learning-rate schedule.** A short fine-tune at 3e-5 gained about 14%, twice what 30M more decisions at 1e-4 had bought. Next: decay the rate over one run (for example 1e-4 → 1e-5), or fine-tune again at 1e-5 from the shipped brain, and compare on the same selection games.
+Done: the rules engine (`arcade/`), the trainer (`pacdqn/pacdqn/arcade_train.py`), the brain (38,508 points and 6.78 levels cleared per game over 50 new games) and the Workshop station. Next, roughly in order of value:
+- **A proper learning-rate schedule.** Two short fine-tunes (3e-5, then 1e-5) gained about 14% and then 11%, far more than 30M decisions at a fixed 1e-4. Next: bake the decay into one run (for example 1e-4 → 1e-5 over the last third) and see whether it matches the hand-made chain, or try 3e-6.
 - **Several seeds.** Train 3 seeds of the same recipe and show the spread on the chart. The shipped curve is a single run.
 - **Checkpoint picker on the page.** Let the reader switch between the brain at 250k, 2M and the final checkpoint, to see what "more training" buys. At 1.4 MB per half-float brain, this needs 8-bit weights (about 0.5 MB each), plus a measured check that they change no moves.
 - **Faster training.** On 4 CPU cores the learner is the bottleneck: about 1,650 decisions/s, while the JavaScript bridge alone serves about 15,800. With a GPU learner, the single bridge becomes the ceiling, so run several bridge processes, each with its own games, and aim for 100M+ decisions.
