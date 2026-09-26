@@ -37,10 +37,11 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   check('bench: walking into the ghost is terminal with target -2.91', tGhost.res.terminal && Math.abs(tGhost.target + 2.91) < 1e-6, `target ${tGhost.target}`);
   check('bench: game-over box visible', await page.$eval('#future-over', (e) => !e.hidden));
   const gap0 = Math.abs(tGhost.gap);
-  await page.click('[data-nudge="10"]'); await sleep(100);
+  // element click, not a coordinate click: scrolled this far down, the sticky tab bar can sit over the button
+  await page.$eval('[data-nudge="10"]', (e) => e.click()); await sleep(100);
   const after = await page.evaluate(() => window.__workshop.bench.compute());
   check('bench: 10 nudges shrink the gap', Math.abs(after.gap) < gap0, `${gap0.toFixed(3)} -> ${Math.abs(after.gap).toFixed(3)}`);
-  await page.click('#bench-overlay button[data-v="ripple"]'); await sleep(100);
+  await page.$eval('#bench-overlay button[data-v="ripple"]', (e) => e.click()); await sleep(100);
   const rippleNote = await txt('#bench-overlay-note');
   check('bench: ripple overlay explains change', /Largest change/.test(rippleNote), rippleNote.slice(0, 90));
   await page.screenshot({ path: 'shots/m_bench_ripple.png', fullPage: false });
@@ -50,13 +51,13 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   check('bench: pellet step reward +9 points -> r = 0.09', Math.abs(pel.r - 0.09) < 1e-9 && !pel.res.terminal, `r ${pel.r}`);
   await page.screenshot({ path: 'shots/m_bench_full.png', fullPage: true });
   // undo restores
-  await page.click('#bench-undo'); await sleep(50);
+  await page.$eval('#bench-undo', (e) => e.click()); await sleep(50);
   // frozen off: target moves when nudging
   await page.click('#bench-overlay button[data-v="game"]');
   await page.click('.chip[data-id="flee"]'); await sleep(50);
   await page.$eval('#bench-frozen', (e) => { e.click(); }); await sleep(50);
   const t1 = (await page.evaluate(() => window.__workshop.bench.compute())).target;
-  await page.click('[data-nudge="10"]'); await sleep(50);
+  await page.$eval('[data-nudge="10"]', (e) => e.click()); await sleep(50);
   const t2 = (await page.evaluate(() => window.__workshop.bench.compute())).target;
   check('bench: with no frozen copy, nudging moves the target', Math.abs(t2 - t1) > 1e-4, `${t1.toFixed(4)} -> ${t2.toFixed(4)}`);
   check('bench: nudge words mention chasing', /chasing|overshoot|moved/.test(await txt('#nudge-words')), (await txt('#nudge-words')).slice(0, 80));
@@ -71,7 +72,7 @@ const check = (name, ok, info = '') => { results.push({ name, ok, info }); conso
   await page.evaluate(() => { const s = window.__workshop.bench.state; s.lr = 0.05; });
   await page.$eval('[data-nudge="10"]', (e) => e.click()); await sleep(50);
   check('bench: big learning rate triggers overshoot message', /overshoot/.test(await txt('#nudge-words')), (await txt('#nudge-words')).slice(0, 60));
-  await page.click('#bench-undo');
+  await page.$eval('#bench-undo', (e) => e.click());
   await page.evaluate(() => { window.__workshop.bench.state.lr = 0.003; });
 
   // ---- Tank
