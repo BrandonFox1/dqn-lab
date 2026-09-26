@@ -65,6 +65,7 @@ class ArcadeConfig:
     exam_games: int = 10
     exam_sticky: float = 0.25
     exam_max_decisions: int = 50_000
+    keep_every: int = 0  # also keep a weights-only ckpt_<steps>.pt every this many decisions (0 = off)
     seed: int = 1
     threads: int = 3
 
@@ -272,6 +273,8 @@ def train(cfg: ArcadeConfig, out: Path, resume: Path | None = None) -> None:
             ck = {"online": online.state_dict(), "optimizer": opt.state_dict(), "steps": steps, "updates": updates,
                   "config": asdict(cfg), "obs_size": env.obs_size, "exam": ex, "best": max(best, ex["mean_score"])}
             torch.save(ck, out / "latest.pt")
+            if cfg.keep_every and steps % cfg.keep_every == 0:  # checkpoints to compare later on fresh games
+                torch.save({k: v for k, v in ck.items() if k != "optimizer"}, out / f"ckpt_{steps}.pt")
             if ex["mean_score"] > best:
                 best = ex["mean_score"]
                 torch.save({k: v for k, v in ck.items() if k != "optimizer"}, out / "best.pt")

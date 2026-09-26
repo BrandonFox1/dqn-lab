@@ -14,6 +14,7 @@ Items 1–7 below happened in one claude.ai conversation on 2026-09-23; its verb
 9. **GitHub Pages**: `.github/workflows/workshop.yml` checks every workshop PR (tests, build, dist freshness, browser QA) and publishes the page to https://brandonfox1.github.io/dqn-lab/ on every merge to `main`, so updates no longer need a claude.ai chat.
 10. **Four ghosts** (2026-09-25): "I want to do #4 (the arcade-faithful version), as accurate as possible." Brandon first offered the original ROMs for the ghost logic, mechanics and graphics, then chose **documents only** (below). Built `arcade/` (the 1980 rules, frame by frame, every rule sourced and tested), a PyTorch trainer that plays that same JavaScript engine through a small bridge, a trained brain, and the Workshop's fourth station. After 5 hours of training on 4 CPU cores, the brain clears 5 levels per game on average: 28,975 points over 50 new games, best game level 12, against 718 for random play. Claude Code also republished the claude.ai copy of the page directly with its Artifact tool, first as a preview mid-training.
 11. **Four ghosts to 60M decisions** (same day, evening): "keep training the brain to 60M decisions". The run resumed from the 30M checkpoint, optimizer included, for another 5.8 hours. A checkpoint from 57.5M decisions won a new selection round and ships: 29,654 on its final check. Mid-run, at Brandon's request, the claude.ai page carried the 39.75M brain, which measured a statistical tie with 30M. The same day's first Pages deploy was blocked by a race in `qa.js`, fixed in PR #5.
+12. **A lower learning rate** (2026-09-25 to 26): "Is there a chance that lowering the learning rate will result in a more precise tuning upward?" Yes. A 7.5M-decision fine-tune at 3e-5, down from 1e-4, added about 14%. The shipped brain now scores 33,720 on its final check and clears 6 levels per game.
 
 ## pacdqn (Python)
 - **Environment**: original Pac-Man-style maze (no Namco assets). Mazes `small` 11×13 and `medium` 18×19. 8-channel grid observation: walls, pellets, power pellets, player, dangerous ghosts, frightened ghosts, ghosts' previous cells, power-timer plane. Ghosts take the BFS-shortest step with probability "aggression" (0.9, 0.7, 0.5, 0.3), can't reverse mid-corridor, flee at half speed after a power pellet. Rewards in points: pellet +10, power +50, ghost +200, clear +500, death −500, step −1; trained on points × 0.01. Death stops bootstrapping, the step limit does not.
@@ -242,7 +243,7 @@ In total: 60M decisions in 10.8 hours and 39,634 training games. Four checkpoint
 | **57.5M (best exam of the run)** | **31,721** ± 1,419 | 30,490 | 59,620 | 5.38 | 34.4 |
 | 60M (end of training) | 30,228 ± 1,169 | 30,695 | 45,040 | 5.14 | 33.1 |
 
-The 57.5M checkpoint now ships as `final.pt`. Its final check on the separate 50 games (seeds 2000–2049), played as the page plays it:
+The 57.5M checkpoint became `runs/arcade/final.pt` (and was then fine-tuned; see the next section). Its final check on the separate 50 games (seeds 2000–2049), played as the page plays it:
 
 | same 50 games | mean | median | best game | levels cleared per game | ghosts per game |
 |---|---|---|---|---|---|
@@ -261,6 +262,36 @@ Practice vs exam for the shipped 57.5M brain, measured the same way as before (1
 | 1% to 7% | 5 | 53 | 30% | 19,782 |
 | under 1% | 7 | 54 | 30% | 30,599 |
 | all | 16 | 179 | | 18,421 |
+
+### Fine-tuning at a lower learning rate
+Every update had moved the weights at a learning rate of 1e-4, the same from the first decision to the 60 millionth. Back-to-back exams swung by up to 9,000 points, partly because of 10-game noise and partly because each update still nudged the brain's close calls one way or the other. Brandon asked whether smaller steps would tune it more precisely. The Arcade station's fine-tune (1e-3 → 3e-4) had already worked once.
+
+- **Setup.** Resume from the shipped 57.5M brain (`runs/arcade/final.pt`, weights only, so Adam's averages restarted) with `--lr 3e-5`, for 10M decisions. The run lives in `runs/arcade_ft`. Two changes were needed first:
+  - `best` in the starting copy was cleared, because the trainer only saves `best.pt` when an exam beats the stored record (35,548);
+  - a new `--keep-every 2500000` option keeps a checkpoint every 2.5M decisions to compare.
+- **Selection** (the same 50 games, seeds 3000–3049):
+
+| checkpoint | mean ± standard error | levels cleared per game |
+|---|---|---|
+| starting point (57.5M, lr 1e-4) | 31,721 ± 1,419 | 5.38 |
+| fine-tune 60M | 32,300 ± 1,350 | 5.48 |
+| fine-tune 62.5M | 32,214 ± 1,634 | 6.00 |
+| **fine-tune 65M** | **36,336** ± 1,780 | **6.40** |
+| fine-tune 65.5M (best 10-game exam: 42,500) | 32,808 ± 1,577 | 5.46 |
+| fine-tune 67.5M (end) | 32,632 ± 1,508 | 5.34 |
+
+- **Final check** (seeds 2000–2049) of the 65M brain, played as the page plays it: **33,720** mean (median 33,465), **6.06 levels cleared per game**, best game 68,310 on level 15. The 57.5M brain scored 29,654 and 4.86 on the same games. Over all 100 test games that's 35,028 against 30,688, **about 14% better**, and it wins on both sets. Full precision scores 34,774 on the same games. The half-float copy changed 8 of 4,000 checked moves, all near-ties.
+- **What it means.** The smaller steps bought twice what 30M more decisions at the old rate had. Every fine-tune checkpoint beat its starting point. The best 10-game exam was once again mostly luck: 42,500 on its exam, 32,808 on fresh games.
+- **The record.** `runs/arcade_ft/combined/` joins the main run's logs up to 57.5M with the fine-tune's, and the page's chart and training time (11.6 hours) come from it.
+
+Practice vs exam for the fine-tuned brain (320,000 decisions with learning off, 174 finished games):
+
+| random-move rate | games of the 16 | finished games | share of all finished | mean score |
+|---|---|---|---|---|
+| 11% to 40% | 4 | 75 | 43% | 8,261 |
+| 1% to 7% | 5 | 53 | 30% | 18,852 |
+| under 1% | 7 | 46 | 26% | 34,160 |
+| all | 16 | 174 | | 18,334 |
 
 ### Shipping the brain
 - **Half floats**: the export stores each weight in 16 bits instead of 32. That turns 2.8 MB of base64 into 1.4 MB, and the page from 3 MB into 1.66 MB. The export measures what that costs on 4,000 real decisions: none of the first brain's moves changed (largest Q-value difference 0.001); one mid-run checkpoint changed 8 of 4,000, and the shipped one none (largest Q-value difference 0.011). Any change is a near-tie: a move can flip only when its two best options are within twice that difference.
@@ -304,4 +335,5 @@ Practice vs exam for the shipped 57.5M brain, measured the same way as before (1
 - **Sticky moves per frame**, in training and exams, as in the Atari research standard. Per-decision stickiness measured as far too harsh (3,522 vs 12,692 for the same brain).
 - **√points rewards** with a −2 lost-life penalty: ghosts and fruit still matter more than dots, but no single reward swamps the rest.
 - **Half-float brain** in the page: half the size, the same moves.
+- **Lower the learning rate at the end.** A fine-tune at 3e-5 (from 1e-4) gained about 14% where 30M more decisions at the old rate gained 7%.
 - **Choose on some games, report on others.** The shipped checkpoint was chosen on 50 games (seeds 3000–3049) and reported on 50 different ones (seeds 2000–2049), like the Arcade brain's fine-tune. The best of 120 ten-game exams overstated its checkpoint by about 3,100 points.
