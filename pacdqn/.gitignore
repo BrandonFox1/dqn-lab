@@ -5,3 +5,4 @@ runs/*/latest.pt
 runs/*/ckpt_*.pt
 runs/*/start.pt
 runs/arcade_ft/best.pt
+runs/arcade_ft2/best.pt

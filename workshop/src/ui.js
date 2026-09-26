@@ -1352,11 +1352,16 @@
         put(label('first level cleared in an exam', X(first[0]) + (right ? -4 : 4), T, right ? 'right' : 'left', 'top', cssVar('--frozen'), false));
       }
       put(label('random play', w - R - 4, Y(base) - 3, 'right', 'bottom', ink3, false));
-      put(label('exam', Math.min(X(last[0]), w - R) - 4, Y(last[1]) - 4, 'right', 'bottom', live, true));
       const pick = META.steps && ex.find((e) => e[0] === META.steps);
-      if (pick) { // the checkpoint this page plays
+      if (pick) { // the ring goes first so the labels steer around it
         k.strokeStyle = live; k.lineWidth = 2; k.fillStyle = cssVar('--sheet-2');
         k.beginPath(); k.arc(X(pick[0]), Y(pick[1]), 5, 0, 6.3); k.fill(); k.stroke();
+        placed.push({ box: [X(pick[0]) - 7, Y(pick[1]) - 7, X(pick[0]) + 7, Y(pick[1]) + 7] });
+      }
+      const ex0 = Math.min(X(last[0]), w - R), ey0 = Y(last[1]);
+      put(best([label('exam', ex0 - 4, ey0 - 4, 'right', 'bottom', live, true), label('exam', ex0 - 12, ey0 - 4, 'right', 'bottom', live, true),
+        label('exam', ex0 - 4, ey0 + 6, 'right', 'top', live, true), label('exam', ex0 - 12, ey0 - 14, 'right', 'bottom', live, true)]));
+      if (pick) {
         const px = X(pick[0]), py = Y(pick[1]), txt = 'the brain on this page', tries = [];
         for (const dy of [-6, 7, 20, -19]) for (const side of px > w * 0.6 ? [-1, 1] : [1, -1])
           tries.push(label(txt, px + side * 8, py + dy, side < 0 ? 'right' : 'left', dy < 0 ? 'bottom' : 'top', live, true));
@@ -1397,7 +1402,7 @@
           <li>Its network is ${META.sizes.join(' → ')}, ${fmt(META.weights || 0)} weights, trained in PyTorch on the same JavaScript engine this page runs. The page runs it with the workshop’s own hand-written network code, and a test checks that both give identical Q-values and play identical games.</li>
           <li>Rewards: the square root of the arcade points, divided by 10 (a dot 0.32, an energizer 0.71, ghosts 1.4 to 4, fruit 1 to 7.1), and −2 for losing a life. A lost life also ends the target, with no future added, like the game-over case on the Bench.</li>
           <li>The same Double DQN target as the Bench, looking 3 moves ahead instead of 1: r₁ + γr₂ + γ²r₃ + γ³·v, with γ = 0.99 per move. There is a replay memory of about a million moves and a frozen copy refreshed every 2,000 updates.</li>
-          <li>Step size: the weights moved with a learning rate of 0.0001 for the first 57.5 million decisions, then 0.00003 for 7.5 million more. The smaller steps let the weights settle instead of jittering, and that short fine-tune alone added about 14%.</li>
+          <li>Step size: the weights moved with a learning rate of 0.0001 for the first 57.5 million decisions, then 0.00003 for 7.5 million, then 0.00001 for 7.5 million more. Smaller steps let the weights settle instead of jittering: the two short fine-tunes added about 14% and then another 11%.</li>
           <li>Exploration: 16 games trained at once, each with its own random-move chance from 40% down to under 0.1%.</li>
           <li>Sticky stick, in training and exams: each frame there is a 25% chance the stick stays where it was, so a new direction sometimes lands a frame or two late (the recipe from Machado et al., 2018). The ghosts are deterministic, so without this every game from the start would be nearly the same, and a memorized route could pass for skill.</li>
         </ul>`);

@@ -146,7 +146,7 @@ ghosts with `--eps-decay-steps 300000 --steps 1000000 --buffer-size 200000`.
 ```bash
 python -m pacdqn.arcade_train train --out runs/arcade --steps 30000000   # ~1,600 decisions/s on 4 CPU cores
 python -m pacdqn.arcade_train exam --run runs/arcade --games 50          # sticky-move exam on fresh seeds
-python -m pacdqn.arcade_train export --run runs/arcade_ft/combined --ckpt final.pt --dest ../workshop/brains/arcade
+python -m pacdqn.arcade_train export --run runs/arcade_ft2/combined --ckpt final.pt --dest ../workshop/brains/arcade
 ```
 
 | piece | choice |
@@ -168,7 +168,9 @@ python -m pacdqn.arcade_train export --run runs/arcade_ft/combined --ckpt final.
 
 **Continued to 60M decisions** (`--resume runs/arcade/latest.pt --steps 60000000`, another 5.8 hours). Exam averages crept from 27,020 (30–35M) to 28,415 (55–60M). Four checkpoints played the 50 selection games: 30M 28,321, 39.75M 30,008, 57.5M 31,721, 60M 30,228. The 57.5M one now ships as `final.pt`. Its final check scored 29,654 on average and cleared 4.86 levels per game; its best game scored 48,000 on level 9. Over all 100 test games it averages 30,688, against 28,648 for the 30M brain: about 7% better for twice the training.
 
-**Fine-tuned at a lower learning rate** (`runs/arcade_ft`: `--resume runs/arcade/final.pt --lr 3e-5 --keep-every 2500000 --steps 67500000`, 1.2 hours). Smaller steps let the weights settle. On the selection games, the 65M checkpoint scored 36,336 against 31,721 for its starting point, and it ships. Its final check scored 33,720 on average, cleared 6.06 levels per game, and its best game scored 68,310 on level 15. That's about 14% better over all 100 test games, from an eighth of the extra training. `--keep-every N` keeps a weights-only checkpoint every N decisions for comparisons like this. The full story is in `docs/HISTORY.md`.
+**Fine-tuned at a lower learning rate** (`runs/arcade_ft`: `--resume runs/arcade/final.pt --lr 3e-5 --keep-every 2500000 --steps 67500000`, 1.2 hours). Smaller steps let the weights settle. On the selection games, the 65M checkpoint scored 36,336 against 31,721 for its starting point, and it ships. Its final check scored 33,720 on average, cleared 6.06 levels per game, and its best game scored 68,310 on level 15. That's about 14% better over all 100 test games, from an eighth of the extra training. `--keep-every N` keeps a weights-only checkpoint every N decisions for comparisons like this.
+
+**Fine-tuned again at 1e-5** (`runs/arcade_ft2`, from the 65M brain, 10M decisions). On the selection games the 72.5M checkpoint scored 39,256 against 36,336, and it ships. Its final check scored 38,508 on average (was 33,720), cleared 6.78 levels per game, ate 41 ghosts per game, and its best game scored 62,780 on level 13. That's about 11% better over all 100 test games. The full story is in `docs/HISTORY.md`.
 
 ## Where to go next
 
