@@ -7,45 +7,45 @@
  ],
  "weights": 519684,
  "format": "f16",
- "steps": 57500000,
+ "steps": 65000000,
  "exam": {
-  "mean_score": 35548.0,
-  "median_score": 36110.0,
-  "max_score": 54240,
-  "mean_level": 6.9,
-  "max_level": 10,
-  "levels_cleared": 59,
-  "ghosts_per_game": 39.4,
+  "mean_score": 34694.0,
+  "median_score": 36090.0,
+  "max_score": 61900,
+  "mean_level": 7.4,
+  "max_level": 13,
+  "levels_cleared": 64,
+  "ghosts_per_game": 36.2,
   "unfinished": 0,
   "scores": [
-   39320,
-   22000,
-   44040,
-   30790,
-   34470,
-   43440,
-   54240,
-   15600,
-   37750,
-   33830
+   35910,
+   39910,
+   42200,
+   15400,
+   31910,
+   26400,
+   61900,
+   19870,
+   36270,
+   37170
   ],
   "levels": [
-   8,
-   4,
-   8,
-   6,
    7,
    8,
-   10,
-   4,
+   9,
+   3,
+   7,
+   6,
+   13,
+   5,
    8,
-   6
+   8
   ]
  },
- "hours": 10.32,
+ "hours": 11.57,
  "half_agreement": {
   "decisions": 4000,
-  "same_move": 1.0,
-  "max_q_diff": 0.032462120056152344
+  "same_move": 0.998,
+  "max_q_diff": 0.017805099487304688
  }
 }

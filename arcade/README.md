@@ -27,14 +27,14 @@ eval_brain.js   plays an exported brain in pure JavaScript, with the Workshop's 
 ```bash
 node test_arcade.js                                  # 51 rule tests
 node eval_brain.js ../workshop/brains/arcade         # 10 exam games with the shipped brain (sticky moves)
-node eval_brain.js ../workshop/brains/arcade --games 50 --seed-base 2000   # the final check: mean 29,654, best game 48,000 on level 9 (~50 s)
+node eval_brain.js ../workshop/brains/arcade --games 50 --seed-base 2000   # the final check: mean 33,720, best game 68,310 on level 15 (~60 s)
 ```
 Training, exams and export live in pacdqn (see its README):
 ```bash
 cd ../pacdqn
 python -m pacdqn.arcade_train train --out runs/arcade --steps 30000000
 python -m pacdqn.arcade_train exam --run runs/arcade --games 50
-python -m pacdqn.arcade_train export --run runs/arcade --ckpt final.pt --dest ../workshop/brains/arcade
+python -m pacdqn.arcade_train export --run runs/arcade_ft/combined --ckpt final.pt --dest ../workshop/brains/arcade
 ```
 
 ## The game API
